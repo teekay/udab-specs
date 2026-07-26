@@ -1,6 +1,8 @@
 # ZoomInfo Exit — Slice 0 Implementation Spec (dev-ready)
 
-> **Status 2026-07-15: IMPLEMENTED** on `udab-server` branch `zoominfo-contact-cleanup` (uncommitted, pending Tomas's review + PR). All three WPs delivered and verified: 70 new tests green, full suite 3357 passed (1 legacy cleanser test removed — it asserted the deleted `unmatched=True` path), migration chain `9d4e1c7a2f38` (business_email index) → `7e2a9c4d1b30` (drop staging tables) upgrade/downgrade/upgrade verified, CLI smoke-tested end-to-end (dry-run guard exits 1; real dry run over ids 0-200 produced CSV + summary), repo-wide legacy greps clean.
+> **Status 2026-07-21: MERGED & DEPLOYED** — landed via PR #654 ("Review ZoomInfo prospects/contacts to be removed", commit `9f40b07`), contained in upstream `master`/`stage`/`prod`; follow-up perf commit `0c77571` ("Speedup the ZoomInfo Exit query") on `master`. The `business_email` index (`9d4e1c7a2f38`) is **live on PROD** — verified 2026-07-21 via `SHOW INDEX` on the Aurora read replica (cardinality ~133M). Deploys auto-run migrations (`migrate.sh` gates the ArgoCD image tag on `alembic upgrade head`).
+>
+> *(Superseded status 2026-07-15: implemented on branch `zoominfo-contact-cleanup`, uncommitted, pending Tomas's review + PR.)* All three WPs delivered and verified: 70 new tests green, full suite 3357 passed (1 legacy cleanser test removed — it asserted the deleted `unmatched=True` path), migration chain `9d4e1c7a2f38` (business_email index) → `7e2a9c4d1b30` (drop staging tables) upgrade/downgrade/upgrade verified, CLI smoke-tested end-to-end (dry-run guard exits 1; real dry run over ids 0-200 produced CSV + summary), repo-wide legacy greps clean.
 
 **Repo**: `udab-server`. **Parent doc**: `zoominfo-exit-archive.md` (context, decisions, open questions).
 **Nature of this slice: strictly informational.** No row in any table is modified, no Salesforce call is made, nothing is deleted or archived. The deliverable is a `--dry-run`-only CLI that classifies prospects and produces a report the CTO can review.
@@ -26,10 +28,29 @@ Split into three work packages. WP-A and WP-B share a frozen interface and build
 
 ### Scale context (why the design looks like this)
 
-- `sp_prospect`: 29,853,292 rows (prod)
+- `sp_prospect`: 29,900,354 rows (prod, measured 2026-07-21 on the Aurora read replica — see breakdown below)
 - `sf_contact`: ~11M rows (prod)
 - `5x5_universal_person`: 342,859,835 rows (prod) — updated **once a month via bulk load**
 - `5x5_universal_person_archive`: empty — **ignore entirely**
+
+#### `sp_prospect` scope breakdown (prod, 2026-07-21)
+
+Measured with a full-scan aggregate on the read replica (blank = `NULL` or `TRIM(...) = ''`):
+
+| Cohort | Rows | % of table |
+|---|---|---|
+| total | 29,900,354 | 100% |
+| ZoomInfo-sourced (`zoominfo_contact_id` non-blank) | 26,571,686 | 88.9% |
+| ZoomInfo-sourced via `zoominfo_url` **only** (contact id blank) | 126,809 | 0.4% |
+| `archived = 1` (pre-existing — Marshall's pipeline never executed; other flows write this flag) | 1,268,767 | 4.2% |
+| **in scope: ZoomInfo-sourced AND `archived = 0`** | **25,769,876** | **86.2%** |
+
+Consequences baked into the design:
+
+- **Full ID-range scan is correct**: only ~13.8% of rows end up `SKIP` (`NOT_ZOOMINFO_SOURCED` ~3.2M + `ALREADY_ARCHIVED` overlap), so filtering ZoomInfo-sourcing in SQL would save almost nothing — and neither column is indexed anyway.
+- **`zoominfo_url` earns its place in the predicate**: narrowing scope to `zoominfo_contact_id` alone would silently drop 126,809 prospects.
+- **~929k ZoomInfo-sourced rows are already archived** by other flows. `archived = 1` alone therefore does NOT identify this project's work; the only safe rollback selector is `archive_reason = 'zoominfo exit'`.
+- **~25.8M prospects enter full evaluation** — the dominant cost of any run. This makes the `business_email` index migration (WP-A) effectively mandatory for a full-table run, not merely a PR-reviewer option.
 
 ---
 
@@ -148,7 +169,7 @@ ALTER TABLE `5x5_universal_person`
   ALGORITHM=INPLACE, LOCK=NONE
 ```
 
-with the symmetric `DROP INDEX` downgrade. In the migration docstring, note: (a) ~343M rows — hours of background IO on prod, no locking; (b) the table is bulk-loaded monthly — **ops must confirm the load procedure preserves secondary indexes** (if the load recreates the table, this index must be added to the load pipeline); (c) whether to merge this migration is explicitly a **PR-reviewer decision** — the matcher works without it, just slowly (`personal_emails` is already indexed by `8b138c25a32e`; only `business_email` lookups would scan).
+with the symmetric `DROP INDEX` downgrade. In the migration docstring, note: (a) ~343M rows — hours of background IO on prod, no locking; (b) the table is bulk-loaded monthly — **ops must confirm the load procedure preserves secondary indexes** (if the load recreates the table, this index must be added to the load pipeline); (c) whether to merge this migration is explicitly a **PR-reviewer decision** — the matcher works without it, just slowly (`personal_emails` is already indexed by `8b138c25a32e`; only `business_email` lookups would scan). *Update 2026-07-21: the prod scope breakdown (above) puts ~25.8M prospects into full evaluation — at that volume the index is effectively required for a full-table run. Resolved: the migration shipped with PR #654 and the index is confirmed live on PROD (`SHOW INDEX`, 2026-07-21, cardinality ~133M distinct values).*
 
 ### Tests (WP-A)
 

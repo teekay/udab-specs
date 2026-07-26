@@ -222,12 +222,14 @@ The core asset: a decision engine that classifies one prospect at a time, plus t
 
 Prod facts (2026-07-14): `5x5_universal_person` **400M+ rows**; `sp_prospect` **29.85M rows**; `5x5_universal_person_archive` **empty** (ignored).
 
+Prod facts (2026-07-21, measured on the Aurora read replica; full breakdown in `zoominfo-exit-slice0-dev.md` → "Scale context"): `sp_prospect` **29,900,354 rows**, of which **26,698,495 (89.3%) are ZoomInfo-sourced** (26,571,686 via `zoominfo_contact_id`; **126,809 via `zoominfo_url` only**), **1,268,767 already `archived = 1`** (written by other flows — Marshall's pipeline never executed, incl. ~929k ZoomInfo-sourced), leaving **25,769,876 in scope** (ZoomInfo-sourced, unarchived). Implications: the full-ID-range scan design is validated (only ~14% of rows SKIP), `zoominfo_url` must stay in the scope predicate, and rollback must select on `archive_reason = 'zoominfo exit'` — never on `archived = 1` alone.
+
 **Order of evaluation — cheap defenses first.** Salesforce keep-rule checks are indexed lookups against ~11M `sf_contact` rows; run them *before* any 5x5 work. Only prospects that survive everything else need a 5x5 verdict. Dedupe by email: evaluate each distinct candidate email once per run, not once per prospect.
 
 **5x5 match backend — MySQL primary (decided; OS-only considered and parked):**
 
 - `personal_emails` — already indexed (migration `8b138c25a32e`, `ALGORITHM=INPLACE, LOCK=NONE`). Direct indexed lookup.
-- `business_email` — **new migration adds the same INPLACE index**. One-time cost on 400M rows: hours of background IO, no locking; ops precedent is the Dec 2025 migration on this very table. Pre-check with prod ops: disk headroom (tens of GB) and replica-lag tolerance.
+- `business_email` — **new migration adds the same INPLACE index**. One-time cost on 400M rows: hours of background IO, no locking; ops precedent is the Dec 2025 migration on this very table. Pre-check with prod ops: disk headroom (tens of GB) and replica-lag tolerance. *Done: shipped via PR #654; confirmed live on PROD 2026-07-21 (`SHOW INDEX` on the read replica, cardinality ~133M).*
 - Rationale vs OpenSearch-only: OS (`5x5_universal_person_v4`) is a mirror synced by a pipeline outside this repo. A lagging/incomplete mirror yields *missing* matches → missing defenses → **wrongful archives**, i.e. errors in the destructive direction, which our default-keep posture exists to prevent. MySQL is the source of truth. Also unverified whether `personal_emails` is in the OS documents at all (this codebase only queries `business_email` there).
 - **OS as dry-run cross-check (optional, cheap):** during dry-runs, run the same candidate emails against OS and report divergence — validates the mirror and strengthens the client sign-off report. If prod ops vetoes the index build, OS-only becomes plan B, gated on (1) the OS mapping containing `personal_emails.keyword`, (2) a pre-run parity gate (doc count vs row count + random-sample presence check).
 
@@ -237,6 +239,23 @@ Prod facts (2026-07-14): `5x5_universal_person` **400M+ rows**; `sp_prospect` **
 - Audit rows written for every archive action.
 - Shard launcher command (5 AWS Batch jobs over the ID range, existing `launch_job` pattern).
 - Safe to run after dry-run review with Tomas only: it's a flag flip on our own table, reversible by `UPDATE ... SET archived=0 WHERE archive_reason='zoominfo exit'`.
+
+### Pre-run checklist for destructive runs (Slices 1–2; decided 2026-07-28)
+
+The `SF_PROJECT_REFERRAL_WEBLEAD` keep rule depends on the `ft_sf_project_name` InnoDB fulltext index, which can silently rot (FTS delete bookkeeping accumulates until `OPTIMIZE TABLE`; observed locally 2026-07-28 as `MATCH` missing rows `LIKE` finds — a missing defense in the destructive direction). Prod was measured healthy 2026-07-28 (parity 6 = 6, Aurora 3.10.3 / 8.0.42-compat, `sf_project` ≈ 18K rows). An automated in-CLI canary was considered and deliberately rejected for Slice 0 (spurious aborts on legitimately punctuated project names would kill overnight shards; dry-run misses are caught by report review). Instead, before any `--execute` run:
+
+1. On the **writer**: `OPTIMIZE TABLE sf_project;` — at 18K rows this takes ~a second (expect "doing recreate + analyze instead"; fulltext tables rebuild via table-copy, briefly blocking writes — immaterial at this size).
+2. On the replica, verify parity (counts must be equal; a small divergence can be legitimate tokenization difference on punctuated names — inspect rows before concluding corruption):
+
+```sql
+SELECT
+  (SELECT COUNT(*) FROM sf_project WHERE IsDeleted = 0
+     AND (Name LIKE '%pipeline referrals%' OR Name LIKE '%web leads%'))       AS via_like,
+  (SELECT COUNT(*) FROM sf_project WHERE IsDeleted = 0
+     AND MATCH(Name) AGAINST('"pipeline referrals" "web leads"' IN BOOLEAN MODE)) AS via_match;
+```
+
+3. Launch the run soon after.
 
 ### Slice 2 — Salesforce contact deletion (destructive — gated)
 
@@ -271,7 +290,7 @@ Salesforce Leads and Smartlead campaign removal, pending C11/C12.
 
 - **A1. Realtime 5x5 match definition.** ~~Blocker~~ **Decided 2026-07-14**: case-insensitive full match on all UP email columns (see Decisions). Residual caveat for the client: `programmatic_business_emails` are *guessed* patterns (name + domain), so a coincidental hit there keeps a prospect that 5x5 never actually verified — acceptable under default-keep, but it lowers archive coverage. Also confirm whether LinkedIn URL should count as a second match key (prospects with no email currently can't be defended by 5x5 at all).
 - **A2.** Does a match in `5x5_universal_person_archive` count as "has a UP ID", or only active UP records?
-- **A3.** Prospects with **no** ZoomInfo ID at all are out of scope regardless of UP match — confirm. And should `data_source_id` play any role in "only traces to ZoomInfo"?
+- **A3.** Prospects with **no** ZoomInfo ID at all are out of scope regardless of UP match — confirm. And should `data_source_id` play any role in "only traces to ZoomInfo"? *Data point (2026-07-21, prod): 126,809 prospects are ZoomInfo-sourced via `zoominfo_url` only (blank `zoominfo_contact_id`) — 0.5% of scope. The either-marker predicate keeps them in; narrowing to contact-id-only would drop them.*
 - **A4.** For `sf_contact`, is the deletion universe (a) contacts email-matched to a ZoomInfo-only prospect (Marshall's approach), or (b) any contact with `ZoomInfo_Contact_Id__c` populated? (b) includes contacts with no local prospect at all.
 - **A5.** Should prospect↔contact association use email equality only, or also our `sp_contact_prospect` link table? When one email matches multiple SF records, we keep the prospect if *any* match is protected — confirm.
 
