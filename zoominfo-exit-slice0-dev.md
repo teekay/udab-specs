@@ -202,6 +202,10 @@ zoominfo-exit
   --batch-size INT     prospects per evaluation batch           (default 100)
   --output-dir PATH    where report files land                  (default ./zoominfo_exit_reports)
   --s3-bucket TEXT     optional; if set, upload report files to s3://<bucket>/zoominfo-exit/<run_id>/
+  --whitelist-url TEXT optional (added 2026-07-28); s3://bucket/key of the client email
+                       whitelist — see "Client Email Whitelist" in the parent doc. Loaded
+                       before scanning (fail fast); also accepted by zoominfo-exit-launch,
+                       which passes it through to every shard.
 ```
 
 `run_id` = `{from_id}-{to_id}-{UTC timestamp yyyymmddHHMMSS}`.
@@ -210,7 +214,7 @@ zoominfo-exit
 
 1. Load the batch's prospects (id, email, supplemental_email, zoominfo_contact_id, zoominfo_url, archived).
 2. Classify `SKIP`s (reason codes above) in Python.
-3. Collect normalized distinct emails from the survivors. Maintain a **per-run in-memory cache** `email -> FiveFiveMatch | None` so each distinct email hits WP-A's matcher at most once per run; call `FiveFiveEmailMatcher.match()` only for uncached emails.
+3. Collect normalized distinct emails from the survivors and call `FiveFiveEmailMatcher.match()` once per batch over that set. ~~Maintain a **per-run in-memory cache** `email -> FiveFiveMatch | None` so each distinct email hits WP-A's matcher at most once per run.~~ **Superseded 2026-07-28**: the cross-batch cache scaled with run length (~6M entries/shard) and OOM-killed two of five 1GB shard jobs on the first full prod run (2026-07-26). With the `business_email` index live, saved lookups are sub-ms; the cache was removed — per-batch dedup only, flat memory.
 4. Prospects with a 5x5 hit → `KEEP` with the 5x5 reason code (+ record `up_id`). **Do not stop** — still evaluate SF matches for them? **No.** Short-circuit: 5x5-defended prospects skip the SF evaluation (cheaper; the report notes only the firing defense). Prospects with no usable email → `ARCHIVE` / `NO_PROSPECT_EMAIL`.
 5. Remaining prospects: one set-based query joining their emails to `sf_contact` (`Email IN (...) AND IsDeleted = 0`) selecting, per contact row: `sf_id`, `Email`, `RecordTypeId`, `DevPhase__c`, `DevOutcome__c`, `ZoomInfo_Contact_Id__c`, plus **one boolean column per keep rule**. Simple column predicates are plain SQL `CASE`/boolean expressions; the four relational rules (task, event, opportunity, project) are **correlated `EXISTS` subqueries** — port the conditions from the legacy guard builders (`find_archive_contact.py:245-321` and `:397-446`) but do NOT pre-load ID lists into memory (that was the legacy staging-scale approach; at batch scale EXISTS is correct). The project rule keeps the `MATCH(Name) AGAINST(...)` fulltext predicate (`ft` index exists on `sf_project.Name`) inside an `EXISTS (SELECT 1 FROM sf_project WHERE sf_id = contact.Project__c AND IsDeleted = 0 AND MATCH...)`.
 6. Aggregate per prospect in Python:
@@ -220,7 +224,7 @@ zoominfo-exit
    - Compute `DELETE_CANDIDATE` per contact per the shared definition; attach the qualifying `sf_id`s to the prospect's row.
 7. Append one CSV row per evaluated prospect; update counters; log progress per batch (`logger.info`, follow `AppLogger` usage in the codebase).
 
-Connection/session handling: reuse one `AsyncSessionLocal()` session for the whole run (read-only); no transactions to manage.
+Connection/session handling: reuse one `AsyncSessionLocal()` session for the whole run (read-only), with a **`rollback()` after every batch** (added 2026-07-28): SQLAlchemy otherwise accumulates one implicit transaction across the run, and on Aurora a run-long read view stalls writer purge cluster-wide and risks the reader killing the query mid-run. Per-batch rollback keeps the snapshot never older than ~one batch.
 
 ### Report format
 
@@ -248,7 +252,7 @@ DB-backed (docker MySQL via `AsyncSessionLocal`, fixtures inserted/cleaned per t
 - One test per keep rule: a prospect + contact fixture engineered so exactly that rule fires; assert decision `KEEP` and the exact reason code. (14 tests — table-driven is fine.)
 - `SF_UNCLASSIFIED` default-keep: contact with DevOutcome `Research Dead End`, no other signals → `KEEP` / `SF_UNCLASSIFIED`, not a delete candidate.
 - Delete gate: contact with `ZoomInfo_Contact_Id__c` set + DevPhase `01 Suspect`, no keep rules → prospect `ARCHIVE` / `NO_DEFENSE`, contact in `delete_candidate_sf_ids`. Variants: gate via DevOutcome `04 No Response`; gated but `ZoomInfo_Contact_Id__c` blank → NOT a delete candidate; gated but one keep rule fires → `KEEP`.
-- `SKIP` paths, `NO_PROSPECT_EMAIL` path, multi-contact aggregation (one defended + one gated → `KEEP`, and the gated one still NOT a delete candidate — a kept prospect produces no delete candidates? **No — it does**: the delete flag is per-contact and independent; assert this explicitly), 5x5 short-circuit (matcher stubbed), email dedup cache (matcher called once for a repeated email).
+- `SKIP` paths, `NO_PROSPECT_EMAIL` path, multi-contact aggregation (one defended + one gated → `KEEP`, and the gated one still NOT a delete candidate — a kept prospect produces no delete candidates? **No — it does**: the delete flag is per-contact and independent; assert this explicitly), 5x5 short-circuit (matcher stubbed), per-batch email dedup (matcher called once per batch with the deduped set; a second batch queries afresh — cross-batch memoization is deliberately absent, see engine flow step 3).
 - Pure-unit: delete-gate normalization (`01 Suspect`→`suspect`, `01 Intro 1`→`intro 1`, etc.), DevOutcome canonicalization mapping.
 - CSV/summary golden test on a tiny range.
 

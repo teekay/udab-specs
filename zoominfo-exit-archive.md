@@ -198,6 +198,8 @@ Remove:
 
 ## Client Email Whitelist (added 2026-07-28)
 
+> Status 2026-07-28: **IMPLEMENTED** on `udab-server` branch `add-sap-meetings-emails-whitelist` (uncommitted, pending PR) — `whitelist.py` loader, `CLIENT_WHITELIST_EMAIL` reason code, engine first-defense check, `--whitelist-url` on both CLI commands; full zoominfo suite 84/84 green. Verify against git before trusting this line.
+
 The client supplied a whitelist of ~150K emails (3.8MB CSV) that must always be KEPT. It is a **one-time export from an already-decommissioned database** — it will never be updated; if the extract turns out wrong, the correction is re-export + overwrite + full re-run.
 
 - **Storage**: a single S3 object in `s3://abstrakt-intelligence/zoominfo-exit/` (alongside the run outputs). No DB table — the engine loads the list into memory either way, so SQL adds no performance benefit, and the list is not used by any operational code outside this feature.
