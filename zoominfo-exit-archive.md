@@ -196,6 +196,17 @@ Remove:
 - Commands: `five_five_gz_csv_file_process`, `load_five_five_gz_csv_files`, `find_unmatched_lead_prospect`, `find_archived_contact`, `find_archived_lead`, `find_archived_smartlead`, `archive_archived_*`, `delete_archived_contact` + registrations in `app/commands/__init__.py`.
 - **Other consumers that must be un-wired**: `app/services/cleanser.py` (cleanses `sp_prospect_unmatched` emails) and `app/commands/deduplicate.py:113` (repoints its `company_id`).
 
+## Client Email Whitelist (added 2026-07-28)
+
+The client supplied a whitelist of ~150K emails (3.8MB CSV) that must always be KEPT. It is a **one-time export from an already-decommissioned database** — it will never be updated; if the extract turns out wrong, the correction is re-export + overwrite + full re-run.
+
+- **Storage**: a single S3 object in `s3://abstrakt-intelligence/zoominfo-exit/` (alongside the run outputs). No DB table — the engine loads the list into memory either way, so SQL adds no performance benefit, and the list is not used by any operational code outside this feature.
+- **CLI**: one **optional** param on `zoominfo-exit` (and passed through by the launcher), a full S3 URL, e.g. `--whitelist-url s3://abstrakt-intelligence/zoominfo-exit/whitelist.csv`. Absent → no whitelist pass (backward compatible). A full URL rather than a key reusing `--s3-bucket`: the outputs bucket param is optional and unrelated; sharing it would couple two concerns.
+- **Engine**: fetch at startup (fail fast if unreadable — before any scanning), normalize with the same `normalize_email` as every other check (trim/lower, drop blanks, dedupe) into a frozenset (~25MB, bounded input — not the run-length-scaling cache class that caused the 2026-07-26 OOMs). New **first defense** after SKIP classification: if `email` OR `supplemental_email` (both — the same email set every other cross-check uses) is on the list → `KEEP` / `CLIENT_WHITELIST_EMAIL`, short-circuiting 5x5 and SF evaluation.
+- **Already-archived prospects are unaffected** (`ALREADY_ARCHIVED` SKIP is classified before defenses run — the ordering produces this for free). Decided 2026-07-28: leave them archived; easily revisited later.
+- **Deliberately rejected** (2026-07-28, Tomas — do not re-litigate): dated/immutable filenames, ETag logging in the summary, bucket versioning, DB table. Not an audited/regulated client; flow is test → run → move on. Matched volume is visible anyway via the `CLIENT_WHITELIST_EMAIL` reason-code count in each summary.
+- **Runbook line**: shards fetch the file at startup — do not re-upload the whitelist while a run is in flight.
+
 ## Delivery Slices
 
 Sliced so each step is independently shippable, reviewable, and strictly less risky than the next. Slices 0–1 are fully unblocked today.
