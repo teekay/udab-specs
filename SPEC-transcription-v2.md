@@ -1,6 +1,9 @@
 # Transcription v2 — Milestone 1 (Quality, Dispositions, Orum)
 
-Status: DRAFT — pending client answers on open questions
+Status: Milestone 1 IMPLEMENTED 2026-07-27 (uncommitted; client testing
+expected 2026-07-28). Open questions below are deliberately deferred — the
+defaults ship: confirmations/follow-ups OUT, labels as specced, no-URL Orum
+tasks silently out of scope. Revisit after client testing.
 
 ## Background
 
@@ -304,6 +307,20 @@ forward-looking feature.)
 
 - None structural. `transcriptUrl` now serves the labeled transcript
   (same S3 key, still plain text).
+- `MAX_TASKS_PER_JOB` raised 50 → 1000 (2026-07-27) for the client's Orum
+  testing — they accepted the OPEX. Still a fixed constant, deliberately
+  not configurable. The feature stays on-demand until the client's tests
+  conclude.
+- **New bonus endpoint (2026-07-27): `GET /api/sf-tasks/{sfTaskId}/transcript`**
+  — transcript lookup by SF Task ID, independent of jobs; does NOT replace
+  the job API. At most one transcript exists per Task (all job rows for an
+  sf_task_sf_id share one flat S3 key), so this returns 0-1 results: 200
+  with `{success, sfTaskId, transcriptUrl}` (fresh presigned URL, 7-day
+  max) when the newest row with a key exists; 404 otherwise, with the
+  error distinguishing never-requested / in-progress / failed. Same
+  API-key auth as the job endpoints. Anticipates the client asking for
+  per-task retrieval; if a per-task *request* flow is ever wanted (GET
+  that also triggers transcription), that is a separate design.
 - `skip_reason` value `not_cloudcall_url` is replaced by
   `unsupported_vendor` for new rows (old rows keep the old string; the read
   view passes strings through, so no client change needed).

@@ -224,7 +224,7 @@ zoominfo-exit
    - Compute `DELETE_CANDIDATE` per contact per the shared definition; attach the qualifying `sf_id`s to the prospect's row.
 7. Append one CSV row per evaluated prospect; update counters; log progress per batch (`logger.info`, follow `AppLogger` usage in the codebase).
 
-Connection/session handling: reuse one `AsyncSessionLocal()` session for the whole run (read-only), with a **`rollback()` after every batch** (added 2026-07-28): SQLAlchemy otherwise accumulates one implicit transaction across the run, and on Aurora a run-long read view stalls writer purge cluster-wide and risks the reader killing the query mid-run. Per-batch rollback keeps the snapshot never older than ~one batch.
+Connection/session handling: dry runs use **`ReadonlyAsyncSessionLocal`** (the reader endpoint — added 2026-07-28, keyed on the `dry_run` flag so a future `--execute` automatically gets the writer; at startup the run logs `SELECT @@innodb_read_only` so shard logs prove which instance they actually hit). One session for the whole run, with a **`rollback()` after every batch** (added 2026-07-28): SQLAlchemy otherwise accumulates one implicit transaction across the run, and on Aurora a run-long read view stalls writer purge cluster-wide and risks the reader killing the query mid-run. Per-batch rollback keeps the snapshot never older than ~one batch.
 
 ### Report format
 
