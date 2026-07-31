@@ -108,7 +108,8 @@ WHERE dialed_number IS NOT NULL
   the window in one SOQL `IN (...)` query and match in memory.
 - **Logging**: per run, summary counts — sessions considered, matched & updated,
   multi-match, unmatched, skipped (no contact), errors. This is the only
-  observability for the first weeks; make it easy to grep.
+  observability for the first weeks; make it easy to grep. (Per-record unmatched
+  reporting added later — see `SPEC-sf-task-session-link-report.md`.)
 - **Deployment**: AWS Batch scheduled job, 1× daily. Exact schedule TBD; running
   after the sales day ends (e.g. 03:00 UTC) keeps the window aligned with "yesterday's
   calls".

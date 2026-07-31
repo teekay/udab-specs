@@ -22,10 +22,22 @@ milestone — slices 1–3. Slices 4–5 are out of scope here and listed at the
 Out of scope for this milestone:
 
 - **Slice 4** — CloudCall API fallback when `Call_Recording_URL_Public__c` is
-  missing/expired, and fetching recordings faster than the ~15–20 min delay
-  before the URL lands on the Task. Join key identified:
-  `synety__Call_Session_Id__c` on Task. Blocked on CloudCall API credentials
-  and API research.
+  missing/expired, and fetching recordings faster than the ~15-min batch that
+  stamps the URL onto the Task (CloudCall has the recording 1–2 min after the
+  call). Auth + endpoints reverse-engineered by the client's team — see
+  `cloudcall-api-notes.md` in this directory. Correction to an earlier guess:
+  the join key is NOT `synety__Call_Session_Id__c` — matching is
+  `Contact.CrmObjectInstanceId == Task.WhoId` plus `ConnectTime` within a
+  5-minute tolerance (closest wins). PoC verified 2026-07-30 with the
+  client-provided credentials: auth OK; 3h window returned 2,819 calls, 97%
+  with a recording URL (host `api.us.cloudcall.com`, drops into the existing
+  vendor pipeline as-is), 96% with an SF Contact Id; recording fetch 206
+  `audio/mp3` with no headers. Note: `Contact.CrmProductName` is returned
+  capitalized ("Salesforce") — compare case-insensitively. Credentials:
+  `CLOUDCALL_LICENSE_KEY`/`CLOUDCALL_USERNAME`/`CLOUDCALL_PASSWORD` in
+  udab-server `.env` for now, destined for `sp_setting` (site integration
+  credentials — in scope for that table, unlike business rules). Matching
+  design constraints: see "Slice 4 (deferred): call↔Task matching" below.
 - **Slice 5** — Auto-discovery: scheduled polling for new recordings +
   immediate transcription without a user request. Blocked on client sign-off
   on Deepgram OPEX.
@@ -363,6 +375,146 @@ slice 3 (needs spike results).
   re-transcription of previously transcribed Tasks. Client informed,
   accepted ("deep pockets").
 
+## Slice 4 (deferred): call↔Task matching — design constraints
+
+Status 2026-07-30: feasibility proven (see the slice 4 bullet + PoC results
+above and `cloudcall-api-notes.md`), implementation deferred. This section
+exists so the matching design can be picked up later with fresh context.
+
+**The hard requirement (Tomas):** a wrong match is worse than no match.
+Failure scenario that must be impossible: rep calls prospect X at 14:05,
+call drops at 14:07, rep redials within seconds. Both calls share
+`WhoId`, the same dialed number, and start times inside any plausible
+tolerance — the braindump's heuristic (`Contact.CrmObjectInstanceId ==
+Task.WhoId` + `ConnectTime` within 5 min, closest wins) can attach the
+wrong leg's recording and silently produce a wrong transcript for a
+quality-scoring workflow. Duration/number invariants do not rescue this
+case (same number; and `leg=c` merging behavior for reconnects is
+unverified). Conclusion: **the heuristic alone is not acceptable as a
+binding decision — only a unique key or deliberate deferral is.**
+
+Decision rule for the implementation (0% wrong by construction):
+
+1. **Task has an (expired) URL** → exact match: the numeric call id in the
+   stored URL path (`/accounts/{acct}/calls/{ID}/recordingurl`) equals the
+   API's `id`. Deterministic; no heuristic involved.
+2. **Task has no URL** → match ONLY on a verified unique key (see below).
+   If no unique key exists or the key is absent: **do nothing and let the
+   Salesforce batch (runs :00/:15/:30/:45) stamp the true URL** — ground
+   truth arrives within ~15 min, so deferral costs latency, never
+   correctness. Never fall back to closest-wins.
+
+**The unique key — VERIFIED 2026-07-30 (10/10 live calls + docs research):**
+
+```
+match:  API SessionID == Task.synety__Call_Session_Id__c   (the call)
+select: the record with Leg == 1 within that session        (the side)
+fetch:  WITHOUT any `leg` query parameter
+```
+
+Facts behind it, with provenance:
+
+- CloudCall runs on PortaOne PortaSwitch (documented — PortaOne case
+  study/CEO quote; two HA systems UK+US matching `ng-api.uk`/`.us`).
+  PortaOne documents that one call = two "legs" = **two records sharing
+  one session id**, and that click-to-call (a dialer's pattern) charges
+  both legs to the rep's account. Each leg carries its own recording —
+  confirmed live: two different audio files per call (rep leg includes
+  ~10s of dialing; the two are NOT byte-identical).
+- `synety__Call_Session_Id__c` is CloudCall's own field: their shipped SF
+  package declares it "Unique Session Id Value for SYNETY Call... Do not
+  change this", externalId=true. Matches the API `SessionID` UUID 10/10.
+  Caveat: the package marks it `unique=false` — do not assume 1:1
+  Task↔session; duplicates share one recording, handle benignly.
+- The SF-linked record is **`Leg == 1`** — the leg *to the rep* (dialer
+  connects the rep first, then dials out; leg 1 connects earlier and its
+  `CLD` is usually the rep's own number, 9/10). Verified 10/10 against
+  the ids embedded in SF-stamped recording URLs. Use `Leg == 1` as the
+  selector; treat `CLD == AccountID` and earlier `ConnectTime` as sanity
+  signals only.
+- `i_account` does NOT discriminate the legs (both legs bill to the rep's
+  account) — it identifies the rep, and matches `Task.synety__i_account__c`.
+
+**Falsified braindump claims** (corrections also noted in
+`cloudcall-api-notes.md`): (1) `leg=c` does *not* return the SF-linked
+record — it returns the *prospect-side* leg 2, whose id and recording URL
+differ from what SF stamps; never use `leg=c`. (2) "Don't use SessionID
+for correlation" was wrong — it's the binding key; they compared it
+against the wrong SF field (`Call_ID__c`). (3) The WhoId+time heuristic is
+unnecessary — drop it entirely.
+
+Defensive rule unchanged: expect exactly one `Leg == 1` record per
+session; anything else (0, 2+, missing session) → defer to the SF batch.
+Recording-channel note: only the leg-1 (rep-side) recording is the audio
+the existing pipeline's channel assumptions were verified on; never feed
+the leg-2 file to transcription.
+
+### Implementation direction — decided 2026-07-30, NOT yet actioned
+
+**Rejected: the scanner/stamper.** The client CTO proposed a timer
+function (e.g. every-minute lambda) that scans for CloudCall Tasks
+without a recording URL, fetches the URL from the CloudCall API, and
+stamps it onto our local `sf_task` mirror. Assessment killed it on three
+counts, agreed with Tomas:
+
+1. *Staleness*: the mirror is synced by the hourly `sfdc-stream` job,
+   while Salesforce itself stamps URLs every 15 min (batch at
+   :00/:15/:30/:45, per `cloudcall-api-notes.md`) — scanning the mirror
+   always loses the race; scanning SF live merely ties it.
+2. *Nobody reads the stamp*: the POST endpoint queries Salesforce live
+   and filters `Call_Recording_URL_Public__c != null`; a URL written to
+   the local mirror is invisible to it.
+3. *Mirror integrity*: `sfdc-stream` upserts full records — locally
+   stamped values get clobbered on the next sync, and the mirror stops
+   being a faithful copy of SF. (Open item: the CTO said "actual code
+   already scans the sf_task table" — true of the client's own
+   `abstrakt-call-transcription` repo perhaps, but NOT of udab-server's
+   endpoint, which queries SF live. Confirm which repo they meant before
+   the next conversation.)
+
+**Chosen: fetch-on-demand inside the existing job flow** (same goal as
+the CTO's idea — sellable as its implementation — but no new
+infrastructure, no timers, no stamping; nothing is written to SF or the
+mirror, only our own job tables + S3 as today):
+
+1. SOQL eligibility widens from `Call_Recording_URL_Public__c != null` to
+   `(Call_Recording_URL_Public__c != null OR
+   synety__Call_Session_Id__c != null)`, also selecting
+   `synety__Call_Session_Id__c` and `synety__Actual_Date_Time_of_Call__c`.
+   A URL-less Task is CloudCall-eligible exactly when it has a session id
+   — the marker is the join key. (Orum tasks without URLs remain
+   untranscribable; Orum has no API.)
+2. For URL-less eligible tasks: resolve the URL via the verified rule —
+   CloudCall auth once per job; per task a narrow calls-window query
+   around `synety__Actual_Date_Time_of_Call__c`, then
+   `SessionID == synety__Call_Session_Id__c`, then `Leg == 1`. Use that
+   record's `CallRecordingURL` as the task's recording URL.
+3. Misses stay safe: recording not yet available (CloudCall has audio
+   1–2 min post-call), no session match, or no unique leg-1 → task
+   `skipped` with a distinct reason (e.g. `recording_not_yet_available`).
+   Retry is free: the next POST re-queries SF and re-resolves. Never
+   guess a leg.
+4. Freebie: the same resolution path can refresh **expired** CloudCall
+   URLs (30-day shelf life) instead of failing those tasks.
+5. **Open fork (decide at implementation)**: resolve at POST time (zero
+   schema changes; POST does a handful of CloudCall calls — the URL-less
+   population is small since only minutes-old calls lack URLs; lean:
+   Tomas + assessment favor this for the on-demand endpoint) vs. at
+   worker time (faster POST, but the task row must snapshot session id +
+   call time → two new nullable columns; the right answer if/when the
+   slice-5 scanner materializes).
+6. **Pre-implementation probe**: check whether `ng-api` supports
+   filtering the calls listing by session id directly (PortaOne's
+   underlying API accepts `h323_conf_id` in lieu of a date range) — that
+   would replace window queries with exact lookups.
+
+Prerequisite unchanged: move `CLOUDCALL_LICENSE_KEY` /
+`CLOUDCALL_USERNAME` / `CLOUDCALL_PASSWORD` from `.env` to `sp_setting`
+(site integration credentials) so the client can edit/rotate them.
+Also worth doing before production: ask CloudCall for a dedicated
+customer-tier API user — the current credential is one person's login
+(`cgooding@`), per the braindump's own risk note.
+
 ## Open questions
 
 - [ ] **~20% of Orum tasks have no recording URL** — accept as untranscribable,
@@ -385,8 +537,8 @@ slice 3 (needs spike results).
 ## Resolved
 
 - [x] Volume/OPEX: out of band — client accepts cost (their money).
-- [x] Slices 4–5 deferred to milestone 2; `synety__Call_Session_Id__c`
-      recorded as the CloudCall API join key for slice 4.
+- [x] Slices 4–5 deferred to milestone 2. (The `synety__Call_Session_Id__c`
+      join-key guess was later falsified — see the slice 4 note above.)
 - [x] Re-transcription of old flat transcripts: none — they stay as-is;
       manual escape hatch (delete the completed task row, re-request).
 - [x] Keyterms: out of Milestone 1 entirely — no param sent, no constant.
