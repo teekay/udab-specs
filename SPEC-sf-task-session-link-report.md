@@ -18,10 +18,12 @@ report therefore covers **both sides**.
 
 ## Solution
 
-Each run writes one CSV to S3 and prints its full path in the run summary:
+Each run writes two CSVs to S3 and prints their full paths in the run summary:
+a per-record detail file and a high-level summary (see Summary CSV below):
 
 ```
 s3://abstrakt-intelligence/talk-track-session-sync/<YYYY-MM-DD>.csv
+s3://abstrakt-intelligence/talk-track-session-sync/<YYYY-MM-DD>-summary.csv
 ```
 
 - Date is the run's start date, UTC, ISO format (e.g. `2026-07-31.csv`).
@@ -54,6 +56,22 @@ One row per unlinked record, either side. Columns:
 The "nearest-miss candidate" is the record that survived the most filter steps
 before the set went empty (see diagnosis below) — it shows the client *which*
 record almost matched and on what field it diverged.
+
+## Summary CSV
+
+The detail file answers "why is this record unlinked?"; the first question in
+practice is "what's the breakdown?", and hundreds of detail rows are
+overwhelming to start from. Each run therefore also writes
+`<YYYY-MM-DD>-summary.csv` next to the detail file:
+
+- Columns: `kind, reason, count` — one row per (kind, reason) pair that
+  occurred, `session` rows first, then within each kind by `count` descending.
+  Header-only when the run is clean.
+- Pure aggregation of the detail rows already in memory — no extra queries and
+  no new diagnosis logic. It is the logged reason histogram, materialized as a
+  CSV the client can open (split by kind, which the log line flattens away).
+- Same date stamp, overwrite-on-rerun, and dry-run semantics as the detail
+  file; a failed upload of either file counts as an error (exit 1).
 
 ## Diagnosis — Session Side
 
@@ -138,10 +156,11 @@ session older than the lookback and will report `no_session_for_number` /
 ## Job Changes
 
 - **Summary**: add `skipped_no_contact` and `tasks_unlinked` counts, log a
-  per-reason histogram, and print the full `s3://...` path in the final
+  per-reason histogram, and print both `s3://...` paths in the final
   `typer.echo` summary.
-- **Upload failure** (`write_s3_file` returns `False`): count as an error →
-  exit code 1. SF stamping already happened; a rerun is harmless by design.
+- **Upload failure** (`write_s3_file` returns `False`, either file): count as
+  an error → exit code 1. SF stamping already happened; a rerun is harmless by
+  design.
 - **`--dry-run`**: build the report but don't upload (dry-run writes nothing
   anywhere); log the row count and reason histogram instead.
 - **Code placement**: everything report-related sits after the matching loop in
@@ -170,6 +189,8 @@ Extend `tests/test_link_talk_track_sessions.py`:
 - Existing match-scenario tests pass unchanged (the loop is untouched).
 - One test per reason code, both sides, asserting reason + nearest-miss
   candidate columns.
+- Summary CSV: aggregation from mixed detail rows (kinds split, counts right,
+  ordering), and the `-summary.csv` key alongside the detail key.
 - Upload failure → exit code 1; dry-run → no upload call.
 
 ## Out of Scope
