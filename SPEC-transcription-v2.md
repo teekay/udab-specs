@@ -451,6 +451,14 @@ the leg-2 file to transcription.
 
 ### Implementation direction — decided 2026-07-30, NOT yet actioned
 
+> **Status update 2026-08-03**: context changed — the on-demand endpoint
+> work is suspended and the client wants URLs on the Task ASAP, so the
+> CTO gets their timer lambda after all, in a shape that survives the
+> rejections below: it stamps **Salesforce itself**, not the mirror. See
+> `SPEC-cloudcall-url-stamper.md`. The rejection below still stands for
+> the *mirror-stamping* variant, and the fetch-on-demand design below
+> remains valid if the endpoint work resumes.
+
 **Rejected: the scanner/stamper.** The client CTO proposed a timer
 function (e.g. every-minute lambda) that scans for CloudCall Tasks
 without a recording URL, fetches the URL from the CloudCall API, and
