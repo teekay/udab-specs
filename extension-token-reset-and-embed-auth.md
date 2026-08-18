@@ -253,3 +253,74 @@ Impact order:
    row in `handle_sf_auth_errors`; with fixes 1-2 in place this becomes recoverable anyway.
 
 The shipped reset button is the manual escape hatch for users currently stuck in the poisoned state.
+
+## 4. Live browser reproduction (2026-08-17) — confirmed on local stack
+
+The section-2/3 mechanism was reproduced **end-to-end in a real browser** against the local stack, with
+DB checkpoints at each step. Not a script hitting endpoints — actual clicks in the actual Survey and Talk
+Track iframes, exactly what a rep does in Orum.
+
+### Harness
+
+An "Orum simulator" host page embeds the two **real** uDab iframes (loaded from the live server through
+the `localhost.previewport.net` ngrok tunnel — the app's own `AIQ_API_BASE`, so the survey page's
+internal `fetch` to `/survey/update-kdm` resolves correctly over HTTPS). Orum itself and the extension are
+not needed: the persistent trap is entirely iframe-↔-server (Path B), and the extension only *mints* the
+signed URLs, which `_generate_embed_url`'s HMAC (`SECRET`, `contact|user|ts`) reproduces exactly.
+
+Test data: one **synthetic** contact (`003Test0000TRAP001`, `Source__c='Fake test data'`) seeded under an
+existing set-up account (Anna Crews's account `0014A00002iQDE3QAO`), so the survey renders fully (company/
+questions/`survey_response` all resolve **local-first** with no SF call — `sync_and_get_contact` /
+`sync_and_get_survey_response` only sync when the row is missing). `Company_Lookup__c` left NULL to skip the
+Error-1004 company gate. The good `sp_user_token` row for the acting user is the real one already present.
+
+### The sequence, with DB checkpoints (all confirmed)
+
+| Browser action | `sp_user_token` after | Rep sees |
+|---|---|---|
+| Page load (healthy) | good, 192 chars | Survey logged-in, KDM unticked; Talk Track renders |
+| Tick **KDM Identified** | **row deleted** | `alert: Error 1013: …`, HTTP **200**, no logout |
+| **Advance prospect** (Talk Track reload) | **blank, 152 chars** (re-created) | Talk Track normal, no login modal |
+| Reload Survey | reads blank row | renders **logged-in** again (blank token accepted) |
+| Tick **KDM Identified** again | deleted again (flap) | `alert: Error 1013: INVALID_SESSION_ID: Session expired or invalid`, HTTP 200 |
+
+The final state looks identical to the healthy state — checkbox reverts, survey looks fine — which is why
+the trap is invisible to the rep. `update_kdm`'s delete uses `token.like(aiqToken)` (effectively equality;
+base64 has no LIKE wildcards), and it fires because the survey page bakes the stored token into its JS and
+sends it back verbatim — confirmed by the request payloads: the first submit carried the good token
+(`u75fXM6…`), the last carried the freshly-created blank token (`QYg1SZbB…==`).
+
+### New finding: an auth failure can spring the trap through `update_kdm`, silently
+
+The good-row deletion in the live run fired on **`invalid_grant`**, not the validation-rule / `NOT_FOUND`
+case section 2 emphasizes: the acting user's stored token credentials no longer authenticate against prod
+SF, so `get_access_token` raised `SalesforceAuthError` *before* `patch_object` was even reached. Because
+`update_kdm`'s bare `except` catches `SalesforceAuthError` too, the good row was deleted and 200-wrapped as
+`Error 1013` — **with no 403 and no logout**.
+
+This is a distinct trigger from Path A: same underlying failure class (`invalid_grant`), but surfacing
+through the **survey submit** (silent delete, HTTP 200) rather than through the extension's `get-prospects`
+(403 → logout → self-heal). It is mechanically inside Path B (the `update_kdm` deleter) and is closed by the
+same fix — **fix 2**: catch `SalesforceAuthError` before the bare `except`, and on that path return a
+distinguishable "please re-authenticate" response instead of deleting the row and emitting `Error 10xx`.
+
+Corollary that matches the client's report: with credentials that always fail the grant, **every**
+`update_kdm` / `mark_qualified` / `save_question` toggle deletes the row — which is exactly why "a row was
+always present to delete" (§2). To exercise the pure non-auth (validation-rule) variant instead, use a token
+with working prod creds so the grant succeeds and the synthetic contact's PATCH fails `NOT_FOUND`.
+
+### Repro recipe
+
+1. Seed a synthetic contact under an account that already has company/questions (`create-test-contact` skill
+   + one `sf_survey_response` row with `Contact__c` = the synthetic id, `IsDeleted=0`). Leave
+   `Company_Lookup__c` NULL.
+2. Mint `ts`/`sig` for `(contact_id, user_id)` with `hmac.new(SECRET, f"{cid}|{uid}|{ts}", sha256)`
+   (`SECRET` from `app/constants/constant.py`).
+3. Serve a host page embedding two iframes against `AIQ_API_BASE` (the ngrok tunnel):
+   `…/survey/?contact_id=…&user_id=…&ts=…&sig=…` and `…/talk-track/embed?…same…`, each with a reload control.
+4. Click **KDM → Advance (reload Talk Track) → Reload Survey → KDM**, checking
+   `SELECT CHAR_LENGTH(token) FROM sp_user_token WHERE user_id=…` after each (192 → gone → 152 → 152 → gone).
+5. Clean up: delete the synthetic `sf_contact` / `sf__raw` / `sf_survey_response`, and restore the user's
+   real token row. **Caution:** the good token is only in the DB — if you clobber it (e.g. a heredoc with
+   `docker exec` missing `-i`, or an unset backup var), recover it from the ROW-format binlog: the DELETE
+   before-image holds the full base64 token (`grep -ao "<prefix>[A-Za-z0-9+/=]*" /var/lib/mysql/binlog.*`).
