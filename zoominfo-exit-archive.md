@@ -1,6 +1,12 @@
 # ZoomInfo Exit — Prospect Archive & Salesforce Contact Deletion
 
-**Status: in progress — Slices 0–1 unblocked by the 2026-07-14 decisions below; the destructive slice (2) stays blocked until the client ratifies the remaining questions and signs off the dry-run report.**
+**Status: in progress — Slice 0 (dry-run evaluator) is shipped. The slice plans below written after Slice 0 (Slices 1–2, audit log) are PRELIMINARY — do not build from them without re-deciding. Next increment: a client-approved capped test batch of Salesforce contact deletions — see `zoominfo-exit-delete-test-batch.md` (2026-08-21), which supersedes Slice 2 and the audit-log section for the deletion work.**
+
+## Decisions (2026-08-21, Tomas)
+
+1. **No audit table** — revises decision #5 below. Deletion provenance = two new columns on `sf_contact` (`deleted_at`, `delete_reason`), the retained local mirror row (permanent snapshot; sync never drops rows or touches these columns), and the per-run deletions CSV.
+2. **Deletion goes first, capped**: client sign-off covers only a test batch (`--delete-contacts --max-deletes 500`). Purpose: live test of mechanics *and* of SF org side effects (triggers/automations) at bounded blast radius. Prospect archiving stays blocked.
+3. First-N candidate selection, successes count toward the cap, run stops at the cap, no `--verify-live` (2xx is authoritative).
 
 ## Decisions (2026-07-14, Tomas)
 

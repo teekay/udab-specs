@@ -1,6 +1,20 @@
 # Talk Track Account Filters (DRAFT)
 
-> **Status: draft.** Written from the client's request of 2026-08-17, before their answers to the open questions at the bottom. Do not implement until those are settled.
+> **Status: work in progress.** Written from the client's request of 2026-08-17; updated 2026-08-18 with prod-data findings, the client's round-2 answers, and the iteration-1 course correction below. Everything below "Course correction" is background for later iterations — several questions there remain open.
+
+## Course correction — iteration 1 (2026-08-18, implemented)
+
+The real need behind the request turned out to be simpler than the sequencer-style filter bar: people land on the Talk Track page thinking "show me all NVIDIA talk tracks", and the free-text Account filter (substring match on account name) serves that poorly. The sequencer comparison was an implementation hint, not the requirement.
+
+**Iteration 1** (done, pending review): replace the free-text Account filter on the Talk Track main page with the same async account autocomplete used in the create-talk-track form, filtering by exact account match.
+
+- `udab-client/src/pages/talk-track/TalkTrack.vue` — free-text input replaced with `@vueform/multiselect` (async options from `GET /sf-accounts?q=`, same UX as `TalkTrackForm.vue`); sends `account_id` instead of `account` to `/talk-track/search`; dark-theme multiselect overrides copied from the form (they were scoped to it by mounting).
+- `udab-server/app/routes/talk_track.py` — `/talk-track/search` gains an `account_id` param (exact match, takes precedence over `account`). The service layer already supported it; the `account` name-substring param remains for compatibility.
+- `udab-server/tests/test_talk_track_routes.py` — new `test_search_by_account_id`.
+
+**Refinement (same day):** `GET /sf-accounts` restricts results to five account statuses by default, which made talk tracks on accounts in other statuses (e.g. Prospect, Fall Out) unreachable through the filter. Decision: the **list-page filter searches accounts in any status** (new `all_statuses=true` param on `/sf-accounts`, passed by `TalkTrack.vue`), while the **create-form picker keeps the status restriction** — creating talk tracks targets current clients, but filtering must reach everything. Default endpoint behavior is unchanged.
+
+Next iterations (account status / record type filters, roll-up) will be driven by user feedback; the analysis below stays relevant for them.
 
 ## Problem
 
@@ -56,9 +70,11 @@ Queried the prod read replica: which accounts do the 2,867 existing talk tracks 
 
 Consequences:
 
-- A record-type filter offering only Pipeline Client + Sapper Consulting (the Sequencer's exact option list) covers 99.5% of existing talk tracks. This all but settles open question 1 in favor of cloning the Sequencer filter.
-- The 14 talk tracks on Parent/Talent accounts would vanish from a default-filtered view. Given the client's "we only use the children accounts", these are probably historical mistakes — but worth one confirmation.
-- Account statuses on talk-track accounts include **"Fall Out"** (12 talk tracks), which is *not* in the client-side `ACCOUNT_STATUSES` constant (Active, Implementing, Signing, On Hold, Canceled). The status filter's option list needs either the missing value(s) added or an explicit decision that Fall Out accounts stay hidden.
+- Pipeline Client + Sapper Consulting alone cover 99.5% of existing talk tracks; the client's round-2 picklist adds Talent Solutions Account and AgencyClient on top (4 and 0 existing talk tracks respectively, assuming the presumed ID mapping).
+- The 10 talk tracks on Parent accounts become permanently invisible under the round-2 hard-exclusion. Given the client's "we only use the children accounts", these are probably historical mistakes — but flag it (question 3).
+- **Account status inventory (prod)**: 12 distinct `Status__c` values exist — Prospect (66,091), Canceled (11,555), Active (2,741), Signing (1,962), Fall Out (558), On Hold (247), Implementing (183), Website Hosting Only (73), Onboarding (60), Paused (18), Pending Cancellation (8), NULL (4). The client-side `ACCOUNT_STATUSES` constant covers only five of these.
+- **Statuses of accounts that actually hold talk tracks** (6 of the 12): Active (884 accounts / 1,797 talk tracks), Canceled (520 / 991), On Hold (20 / 40), Implementing (21 / 22), Fall Out (9 / 12), Signing (4 / 4). Two things stand out: no Prospect account holds a talk track (so the dominant status is irrelevant to this UI), and roughly a third of all talk tracks — 991, including 441 published — sit on **Canceled** accounts. A default of Active(+Implementing) hides those; the filter being editable makes them reachable, but the client should know the default hides a third of the data.
+- The status filter's option list should be the six statuses above (or all twelve) — the current five-value `ACCOUNT_STATUSES` constant is missing Fall Out at minimum.
 - The Abstrakt premise holds in prod: 57 "Abstrakt …" test accounts sit under Pipeline Client, so the record-type filter keeps them visible with no name-based special-casing.
 
 ## Current state (why the noise appears)
@@ -70,32 +86,51 @@ None of the talk-track surfaces filter by record type today:
 - Reports `GET /talk-track/reports/accounts-missing-talk-track`: `app/services/talk_track/reports.py` filters status (Active/Implementing) + service lines only.
 - Analytics `GET /talk-track/sessions`: no account-side filters.
 
+## Client answers — round 2 (2026-08-18)
+
+Verbatim decisions from the client's follow-up:
+
+- **Record type picklist has four options**: Pipeline Client, Sapper Consulting, Talent Solutions Account, AgencyClient. (Talent thus moved from "hide" in the original ask to "selectable".)
+- **Parent Account is hard-excluded** — filtered out entirely, not offered in the picklist. Talk-track surfaces never show Parent accounts regardless of filter state. The 10 existing talk tracks on Parent accounts become unreachable through these views.
+- **Sequencer mimicry clarified**: clone the sequencer's account **status** filter verbatim; clone the record type filter as a component but **swap its picklist** for the four options above.
+- **New ask, meaning unclear**: "could we have the talk tracks roll up to the account? Then we could still filter by account filters AND/OR talk track filters but have everything at least rolling up." See open question 2 — this is a scope fork, not a detail.
+
+The client referenced a linked doc ("info regarding types linked above") for the record types; that link is needed to map the two new picklist names to RecordTypeIds (open question 1).
+
 ## Proposed scope
 
 1. **Frontend** — add a two-cluster filter bar (Sequencer style) to `TalkTrack.vue`, `Reports.vue`, `Analytics.vue`:
-   - **Account filters**: Record Type multi-select, Account Status multi-select
+   - **Account filters**: Record Type multi-select (four options: Pipeline Client, Sapper Consulting, Talent Solutions Account, AgencyClient), Account Status multi-select (cloned from the sequencer)
    - **Talk track filters**: existing controls (name, draft/published/archived status, templates) — relabeled so the two "status" filters can't be confused
-2. **Backend** — accept `status[]` / `recordType[]` on `/talk-track/search`, `/talk-track/sessions`, and the missing-talk-track report; filter on the joined `SfAccount`, same pattern as `strategy.py`.
+2. **Backend** — accept `status[]` / `recordType[]` on `/talk-track/search`, `/talk-track/sessions`, and the missing-talk-track report; filter on the joined `SfAccount`, same pattern as `strategy.py`. Regardless of filter params, restrict results to the four picklist record types (this is what implements the Parent hard-exclusion).
 3. **Filter carry-through** — selections on the main page follow the user to Reports/Analytics and stay editable on each page. Needs cross-page state (query params or a store); the Sequencer's provide/inject is per-page and doesn't carry.
-4. **Parent accounts** — excluded "for now" by simply not offering Parent as a record-type option (the Sequencer precedent: only Pipeline Client + Sapper Consulting are offered).
-5. **No name-based "Abstrakt" exclusion** — dropped by the client's own revision.
+4. **No name-based "Abstrakt" exclusion** — dropped by the client's own revision.
+5. **Account roll-up** — shape TBD pending open question 2; likely an account-grouped presentation of the talk-track list and/or per-account aggregation in Analytics.
 
 ## Assumptions
 
-- 'Parent', 'Inbound', 'Talent' are Account **record types** (not statuses or tags), mapped as in the table above.
-- "See sequencer" means the filter bar layout and its two-record-type option list, not sequencer batch logic.
-- The record-type option list itself is the exclusion mechanism — no separate hard-coded exclusion layer.
+- The four picklist names are Account **record types**; "Talent Solutions Account" = the "- Staffing" type `0124w000001NbCpAAK` (strong name-pattern evidence). "AgencyClient" is unmapped — see question 1.
 - "Account status" = `SfAccount.Status__c`, distinct from talk-track status (draft/published/archived).
-- The editor's account typeahead is out of the revised scope (named in the original ask, absent from the revised page list) — see question 3.
+- The backend enforces the four-type restriction unconditionally (Parent exclusion is not a client-side default that can be toggled off).
+- Account Tags are out of scope: the client said to mimic status and swap the record-type picklist, and never mentioned the sequencer's third account filter.
+- The editor's account typeahead is out of the revised scope (named in the original ask, absent from the revised page list) — see question 4.
+
+## Settled by client round 2
+
+- Record type picklist: the four options listed above; no Inbound option.
+- Parent Account: always excluded, no picklist entry.
+- Status filter: clone the sequencer's (options and behavior).
 
 ## Open questions for the client
 
-1. **Record type options**: offer exactly Pipeline Client + Sapper Consulting like the Sequencer (implicitly excluding Parent/Inbound/Talent)? Prod data says these two cover 99.5% of existing talk tracks, so this is now a recommendation, not an open choice — confirm, and confirm that the 14 existing talk tracks on Parent/Talent accounts (10 + 4) may disappear from the default view. Is "Talent" the record type on the "- Staffing" accounts?
-2. **Default status selection**: Active only (Sequencer default), or Active + Implementing (what Reports targets today)? Also: prod has account statuses outside the `ACCOUNT_STATUSES` constant (e.g. "Fall Out", carried by 12 talk tracks) — should the option list include them?
-3. **Editor account search**: should the create-talk-track typeahead be restricted to the same record types? It currently returns every non-deleted account, Parent included.
-4. **Reports interaction**: the missing-talk-track report hard-codes status Active/Implementing and specific service lines. Does the new Account Status filter override that status list, or does the report keep its fixed population and gain only the record-type filter?
-5. **Account tags**: the Sequencer's Account cluster also has Tags. In scope here or not?
+1. **RecordTypeId mapping** (blocker): which IDs are "Talent Solutions Account" and "AgencyClient"? The client's linked record-types doc should answer this. Presumed: Talent Solutions Account = `0124w000001NbCpAAK` ("- Staffing" accounts). AgencyClient candidates: `0124A000001Qc5kQAC` (1,213 accounts, plain company names) or `012A0000000kZbFIAU` (1,372 accounts, "- Inbound SDR"/"- Social Boost"). The original request excluded 'Inbound', which argues AgencyClient is the former — but this must be confirmed, not guessed. (No record-type name table exists locally; SF sandbox creds are stale.)
+2. **"Roll up to the account"** (scope fork): which shape is meant?
+   - a) Main list grouped by account — account rows expand to show their talk tracks
+   - b) Analytics aggregated per account — sessions/usage totaled at account level
+   - c) A new account-level view — one row per account with talk tracks, status, usage
+   Also: does "roll up" ever mean aggregating child-account talk tracks up to the Parent account? That would sit oddly with the Parent hard-exclusion, so worth an explicit yes/no.
+3. **Status defaults & data caveats**: Active-only default (sequencer's) hides the ~1,000 talk tracks on Canceled accounts (441 published); the sequencer's five-status list has no "Fall Out", leaving those accounts (12 talk tracks) unreachable. Confirm both are acceptable. Same for the 10 talk tracks on Parent accounts, which the hard-exclusion makes permanently invisible.
+4. **Editor account search**: should the create-talk-track typeahead be restricted to the same four record types? It currently returns every non-deleted account, Parent included.
+5. **Reports interaction**: the missing-talk-track report hard-codes status Active/Implementing and specific service lines. Does the new Account Status filter override that status list, or does the report keep its fixed population and gain only the record-type filter?
 6. **Carry-through mechanics**: should filters survive refresh / be shareable via URL (query params), or is in-session memory enough?
 7. **Analytics detail**: account filters apply to the session's account, correct?
-
-Question 1 decides the shape of the work: either clone the Sequencer's two-option filter as-is, or introduce record-type names the codebase doesn't currently have (there is no record-type name table locally — only the two hard-coded ID constants).
