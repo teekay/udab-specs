@@ -84,7 +84,7 @@ At most one transcript per SF Task, ever: all job rows for a Task share one S3 k
 
 ## API surface
 
-- API key (`X-AIQ-API-KEY`, `app/routes/api/transcription_job_api.py`): `POST /api/transcription-jobs`, `GET /api/transcription-jobs/{id}` (progress only until completed, then tasks + presigned URLs), `GET /api/sf-tasks/{sfTaskId}/transcript` (read-only lookup, 404 distinguishes never/in-progress/failed). Bad key = HTTP 200 `{"unauthorized": ...}` (platform quirk). Client guide: `api-howto.md`.
+- API key (`X-AIQ-API-KEY`, `app/routes/api/transcription_job_api.py`): `POST /api/transcription-jobs`, `GET /api/transcription-jobs/{id}` (progress only until completed, then tasks + presigned URLs), `GET /api/sf-tasks/{sfTaskId}/transcript` (read-only lookup, 404 distinguishes never/in-progress/failed). Bad key = HTTP 200 `{"unauthorized": ...}` (platform quirk). Client guide: `udab-server/docs/transcription-api-howto.md`.
 - JWT + `VIEW_CALLS` (`app/routes/transcription_job.py`): `GET /transcription-jobs` (filters `start_date`/`end_date`/`source`/`status`/`call_result`; per-job `cost`, `summary` with `total_cost_usd`, `jobs_by_status`, `tasks_matrix`), `GET /transcription-jobs/{id}/tasks`, `GET /transcription-jobs/export/runs.csv`, `.../export/tasks.csv`.
 
 ## Gotchas
@@ -95,7 +95,7 @@ At most one transcript per SF Task, ever: all job rows for a Task share one S3 k
 - The SOQL `LIMIT` runs before claimed-exclusion — hence the separate 10,000 guard + `ORDER BY CreatedDate DESC` for the poller (fresh calls first; a 1,000-cap on already-done rows would starve new ones).
 - `sp_setting` is site-wide configuration (credentials, API keys) only; disposition lists, phrase lists and tolerances are code constants — deploy to change them.
 - Salesforce POSTs occasionally take ~20 s (query-plan variance); use a 60 s+ client timeout. The `/api/*` middleware answers 200 on a bad key.
-- `api-howto.md` still says follow-up and confirmation calls are not included — stale since 2026-08-24 (they are in the constant now).
+- `udab-server/docs/transcription-api-howto.md` still says follow-up and confirmation calls are not included — stale since 2026-08-24 (they are in the constant now).
 - Extension / native-app live transcription (`sp_call_transcript_local`, `deepgram-key-provisioning.md`) is a different pipeline; don't conflate `audio_s3_key` there with this one (which stores no audio).
 - Two workers can still race on the same Task (manual POST + poller tick); cost is one duplicate Deepgram call, never a wrong transcript.
 
@@ -119,4 +119,4 @@ At most one transcript per SF Task, ever: all job rows for a Task share one S3 k
 - `cloudcall-url-stamper.md` — `stamp-cloudcall-urls` per-minute job stamping SF (mirror stamp added later by auto).
 - `auto.md` — `auto-transcribe` poller, `create_job` service extraction, CreatedDate window, claimed exclusion, single-flight, chunk cap, `source` filter in the UI, `task` in `sfdc-stream`.
 - `spend-report.md` — estimated cost per run/task, summary matrix, CSV exports.
-- `api-howto.md` — client-facing API guide.
+- `udab-server/docs/transcription-api-howto.md` — client-facing API guide (lives with the API, not here).

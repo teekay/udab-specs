@@ -17,7 +17,6 @@ Reading rule: open the area's `NOTES.md` first, then only active specs (draft/re
 | [v2.md](transcription/v2.md) | spec | done | 2026-08-03 | Milestone 1: diarized Caller/Prospect/Automated transcripts, disposition variant list, Orum recordings via ?raw=true. |
 | [cloudcall-url-stamper.md](transcription/cloudcall-url-stamper.md) | spec | done | 2026-08-03 | stamp-cloudcall-urls: per-minute job resolving CloudCall recording URLs (SessionID + Leg==1) and PATCHing SF Tasks. |
 | [cloudcall-api-notes.md](transcription/cloudcall-api-notes.md) | notes | done | 2026-07-30 | Reverse-engineered CloudCall ng-api auth and calls listing, with verified corrections (no leg=c, SessionID is the key). |
-| [api-howto.md](transcription/api-howto.md) | howto | done | 2026-07-28 | API-key client guide: create a transcription job, poll it, download transcripts, look up a transcript by SF Task Id. |
 | [read-view.md](transcription/read-view.md) | spec | done | 2026-07-08 | Read-only Transcriptions tab on the Calls page: job list, task drill-down, shared TranscriptViewer, JWT list endpoints. |
 | [deepgram-key-provisioning.md](transcription/deepgram-key-provisioning.md) | spec | done | 2026-06-14 | Server-minted short-lived Deepgram tokens for the native app, per-user stt_access/stt_model on sp_extension_version. |
 
