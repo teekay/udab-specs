@@ -1,3 +1,12 @@
+---
+kind: notes
+status: done
+area: transcription
+updated: 2026-07-30
+repos: [udab-server]
+summary: "Reverse-engineered CloudCall ng-api auth and calls listing, with verified corrections (no leg=c, SessionID is the key)."
+---
+
 # CloudCall API — auth & recording fetch (client's reverse-engineering notes)
 
 > Provenance: braindump from the client's team, received 2026-07-28, preserved
@@ -5,12 +14,12 @@
 > API; running in their `abstrakt-call-transcription` repo
 > (`src/cloudcall_client.py`). NOT from CloudCall's documentation. Treat the
 > "dead ends" section as authoritative — it exists so we don't repeat the
-> investigation. udab context: this feeds SPEC-transcription-v2 slice 4;
+> investigation. udab context: this feeds v2.md slice 4;
 > credentials live in udab-server `.env` for now (`CLOUDCALL_LICENSE_KEY`,
 > `CLOUDCALL_USERNAME`, `CLOUDCALL_PASSWORD`), destined for `sp_setting`.
 
 > ## ⚠ CORRECTIONS (verified 2026-07-30, 10 live calls + docs research —
-> ## see SPEC-transcription-v2 "Slice 4: call↔Task matching")
+> ## see v2.md "Slice 4: call↔Task matching")
 >
 > The auth flow and credentials below are accurate. Three claims are NOT:
 >

@@ -1,7 +1,16 @@
+---
+kind: handoff
+status: done
+area: extension
+updated: 2026-08-17
+repos: [udab-server, udab-client, abstrakt-intelligence-extension]
+summary: "Admin sp_user_token reset button, and why blank/deleted token rows cause silent Error 1013 in embeds with no 403/logout."
+---
+
 # Handoff: sp_user_token reset button + why embed auth failures never log users out
 
 Date: 2026-08-14 (analysis re-verified and substantially corrected same day). Companion to
-[extension-403-auth-fix.md](extension-403-auth-fix.md) — that spec fixes client-side 403 *detection*;
+[403-auth-fix.md](403-auth-fix.md) — that spec fixes client-side 403 *detection*;
 this note covers the server-side failure mode where **no 403 is ever emitted**, so no amount of
 client-side detection can help.
 
@@ -150,7 +159,7 @@ embeds outlive the extension logout** — already-minted iframe URLs stay valid 
 extension auth, so the user can keep working the survey/talk-track while logged out, and a talk-track
 reload in that window blank-creates the row. The eventual extension re-login upserts a good row, so
 this path poisons only the window until re-login (indefinitely on pre-3.5.2 clients, where the fetch
-regression suppresses the logout — see extension-403-auth-fix.md).
+regression suppresses the logout — see 403-auth-fix.md).
 
 **Path B — `update_kdm`'s delete-on-ANY-exception** (`survey.py:553-565`, commit `9f314b1`
 "auto delete user token", 2026-02-01). A user toggles KDM and *anything* fails — most mundanely a

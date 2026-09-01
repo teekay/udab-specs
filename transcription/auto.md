@@ -1,3 +1,12 @@
+---
+kind: spec
+status: done
+area: transcription
+updated: 2026-08-24
+repos: [udab-server, udab-client]
+summary: "auto-transcribe poller: per-minute scan of new Pipeline Client/Active Tasks, single-flight worker, claimed-exclusion."
+---
+
 # Automatic transcription — scheduled poller over the transcription pipeline
 
 Status: IMPLEMENTED 2026-08-24 (uncommitted, branch `transcribe-proactively`

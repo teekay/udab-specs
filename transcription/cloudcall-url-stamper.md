@@ -1,3 +1,12 @@
+---
+kind: spec
+status: done
+area: transcription
+updated: 2026-08-03
+repos: [udab-server]
+summary: "stamp-cloudcall-urls: per-minute job resolving CloudCall recording URLs (SessionID + Leg==1) and PATCHing SF Tasks."
+---
+
 # CloudCall URL Stamper — timer job, stamps Salesforce
 
 Status: DRAFT 2026-08-03; blockers resolved same day (lives in
@@ -22,7 +31,7 @@ onto the Task in Salesforce** — not onto the local `sf_task` mirror.
 
 - The client CTO proposed a scanner/stamper lambda. The variant that
   stamps the **local mirror** was assessed and rejected 2026-07-30
-  (SPEC-transcription-v2, "Implementation direction"): the mirror is
+  (v2.md, "Implementation direction"): the mirror is
   stale, nothing reads a mirror stamp, and the sync clobbers it.
   Fetch-on-demand inside the udab job flow was chosen instead.
 - Context changed 2026-08-03: the on-demand endpoint work is suspended
@@ -119,7 +128,7 @@ Each tick:
    `leg` parameter** (per the corrections in `cloudcall-api-notes.md`;
    `leg=c` returns the wrong leg). Group records by `SessionID`.
 
-   Per candidate, the verified exact rule (SPEC-transcription-v2 slice 4,
+   Per candidate, the verified exact rule (v2.md slice 4,
    verified 10/10 on 2026-07-30):
 
    ```
@@ -195,7 +204,7 @@ recording. Sub-cases to confirm with the client, not blockers:
 - CloudCall: `CLOUDCALL_LICENSE_KEY` / `CLOUDCALL_USERNAME` /
   `CLOUDCALL_PASSWORD` move from `.env` to `sp_setting` (site
   integration credentials — long-standing prerequisite from
-  SPEC-transcription-v2; this job makes it due). New `Setting` keys +
+  v2.md; this job makes it due). New `Setting` keys +
   seed. Today the login is personal (`cgooding@`); the ask for a
   dedicated customer-tier API user becomes more urgent once a
   production timer depends on it.

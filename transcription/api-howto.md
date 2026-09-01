@@ -1,3 +1,12 @@
+---
+kind: howto
+status: done
+area: transcription
+updated: 2026-07-28
+repos: [udab-server]
+summary: "API-key client guide: create a transcription job, poll it, download transcripts, look up a transcript by SF Task Id."
+---
+
 # Call Transcription API — Quick HOWTO
 
 Transcribes call recordings (CloudCall **and Orum**) from Salesforce Tasks via Deepgram. You create a job with filters, poll until it's done, then download transcripts from the returned URLs. There's also a direct lookup by SF Task Id for calls already transcribed.

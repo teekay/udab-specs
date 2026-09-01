@@ -1,6 +1,15 @@
+---
+kind: spec
+status: in-progress
+area: zoominfo-exit
+updated: 2026-08-21
+repos: [udab-server]
+summary: "Umbrella: archive ZoomInfo-only prospects and delete SF contacts; decisions, keep rules, slices, open client questions."
+---
+
 # ZoomInfo Exit — Prospect Archive & Salesforce Contact Deletion
 
-**Status: in progress — Slice 0 (dry-run evaluator) is shipped. The slice plans below written after Slice 0 (Slices 1–2, audit log) are PRELIMINARY — do not build from them without re-deciding. Next increment: a client-approved capped test batch of Salesforce contact deletions — see `zoominfo-exit-delete-test-batch.md` (2026-08-21), which supersedes Slice 2 and the audit-log section for the deletion work.**
+**Status: in progress — Slice 0 (dry-run evaluator) is shipped. The slice plans below written after Slice 0 (Slices 1–2, audit log) are PRELIMINARY — do not build from them without re-deciding. Next increment: a client-approved capped test batch of Salesforce contact deletions — see `delete-test-batch.md` (2026-08-21), which supersedes Slice 2 and the audit-log section for the deletion work.**
 
 ## Decisions (2026-08-21, Tomas)
 
@@ -221,7 +230,7 @@ Sliced so each step is independently shippable, reviewable, and strictly less ri
 
 ### Slice 0 — read-only evaluator + dry-run report (no writes anywhere)
 
-> **Dev-ready spec: see `zoominfo-exit-slice0-dev.md`** (work packages WP-A / WP-B, frozen interface, reason-code vocabulary, test plan). The summary below is superseded by that doc where they differ.
+> **Dev-ready spec: see `slice0-dev.md`** (work packages WP-A / WP-B, frozen interface, reason-code vocabulary, test plan). The summary below is superseded by that doc where they differ.
 
 The core asset: a decision engine that classifies one prospect at a time, plus the `--dry-run` command around it.
 
@@ -241,7 +250,7 @@ The core asset: a decision engine that classifies one prospect at a time, plus t
 
 Prod facts (2026-07-14): `5x5_universal_person` **400M+ rows**; `sp_prospect` **29.85M rows**; `5x5_universal_person_archive` **empty** (ignored).
 
-Prod facts (2026-07-21, measured on the Aurora read replica; full breakdown in `zoominfo-exit-slice0-dev.md` → "Scale context"): `sp_prospect` **29,900,354 rows**, of which **26,698,495 (89.3%) are ZoomInfo-sourced** (26,571,686 via `zoominfo_contact_id`; **126,809 via `zoominfo_url` only**), **1,268,767 already `archived = 1`** (written by other flows — Marshall's pipeline never executed, incl. ~929k ZoomInfo-sourced), leaving **25,769,876 in scope** (ZoomInfo-sourced, unarchived). Implications: the full-ID-range scan design is validated (only ~14% of rows SKIP), `zoominfo_url` must stay in the scope predicate, and rollback must select on `archive_reason = 'zoominfo exit'` — never on `archived = 1` alone.
+Prod facts (2026-07-21, measured on the Aurora read replica; full breakdown in `slice0-dev.md` → "Scale context"): `sp_prospect` **29,900,354 rows**, of which **26,698,495 (89.3%) are ZoomInfo-sourced** (26,571,686 via `zoominfo_contact_id`; **126,809 via `zoominfo_url` only**), **1,268,767 already `archived = 1`** (written by other flows — Marshall's pipeline never executed, incl. ~929k ZoomInfo-sourced), leaving **25,769,876 in scope** (ZoomInfo-sourced, unarchived). Implications: the full-ID-range scan design is validated (only ~14% of rows SKIP), `zoominfo_url` must stay in the scope predicate, and rollback must select on `archive_reason = 'zoominfo exit'` — never on `archived = 1` alone.
 
 **Order of evaluation — cheap defenses first.** Salesforce keep-rule checks are indexed lookups against ~11M `sf_contact` rows; run them *before* any 5x5 work. Only prospects that survive everything else need a 5x5 verdict. Dedupe by email: evaluate each distinct candidate email once per run, not once per prospect.
 

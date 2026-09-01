@@ -1,3 +1,12 @@
+---
+kind: spec
+status: done
+area: extension
+updated: 2026-07-03
+repos: [abstrakt-intelligence-extension]
+summary: "apiFetch wrapper and global $.ajaxError handler so any 403 clears the extension session and forces re-login."
+---
+
 # Fix: Extension 403 auth error handling
 
 ## Problem

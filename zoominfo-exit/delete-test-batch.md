@@ -1,6 +1,15 @@
+---
+kind: spec
+status: done
+area: zoominfo-exit
+updated: 2026-08-21
+repos: [udab-server]
+summary: "--delete-contacts --max-deletes N: capped live SF contact deletion, provenance columns on sf_contact, deletions CSV."
+---
+
 # ZoomInfo Exit — Test-Batch Salesforce Contact Deletion (dev-ready)
 
-**Status: approved for build (2026-08-21, Tomas).** Client signed off on **this run only**: hard-delete a capped test batch of Salesforce contacts (target: 500). No prospect archiving, no Leads, no Smartlead, **no audit table**. The delivery slices in `zoominfo-exit-archive.md` written after Slice 0 are preliminary — this document supersedes them for the deletion work; do not carry over their details without re-deciding.
+**Status: approved for build (2026-08-21, Tomas).** Client signed off on **this run only**: hard-delete a capped test batch of Salesforce contacts (target: 500). No prospect archiving, no Leads, no Smartlead, **no audit table**. The delivery slices in `archive.md` written after Slice 0 are preliminary — this document supersedes them for the deletion work; do not carry over their details without re-deciding.
 
 **Why a live test**: beyond proving the mechanics, the client wants to observe what the SF org *does* when contacts are deleted — triggers, workflows, automations. A bounded batch caps the blast radius (e.g. we must not find out via 360K automated emails).
 
@@ -84,7 +93,7 @@ The per-prospect decisions CSV and summary JSON are unchanged in shape. Deletion
 2. Confirm the nightly SFDC contact sync ran recently — the mirror is the evaluation authority (no live verification, by decision #5).
 3. Single process (AWS Batch one-off job or dev box over `aiqvpn`):
    `zoominfo-exit --delete-contacts --max-deletes 500 --from-id 0 --to-id <max sp_prospect.id> --whitelist-url s3://abstrakt-intelligence/zoominfo-exit/whitelist.csv --s3-bucket abstrakt-intelligence`
-4. Pre-run: `OPTIMIZE TABLE sf_project` + the LIKE/MATCH parity check from `zoominfo-exit-archive.md` → "Pre-run checklist" (the fulltext keep rule is a defense; this run is destructive).
+4. Pre-run: `OPTIMIZE TABLE sf_project` + the LIKE/MATCH parity check from `archive.md` → "Pre-run checklist" (the fulltext keep rule is a defense; this run is destructive).
 5. **Observe the org** — the point of the test. Coordinate with the client to watch for trigger/automation side effects (email sends, workflow logs) immediately after the run.
 6. Verify: in SF, the deleted contacts sit in the recycle bin (~15 days); locally,
    `SELECT COUNT(*) FROM sf_contact WHERE delete_reason = 'zoominfo exit'` matches `contacts_deleted`.

@@ -1,3 +1,12 @@
+---
+kind: spec
+status: done
+area: talk-track
+updated: 2026-07-12
+repos: [udab-server]
+summary: "Daily job stamping Talk_Track_Session_Id__c on SF call Tasks by dialed number + contact + 1h window."
+---
+
 # Linking Salesforce Call Tasks to Talk Track Sessions
 
 ## Problem
@@ -109,7 +118,7 @@ WHERE dialed_number IS NOT NULL
 - **Logging**: per run, summary counts — sessions considered, matched & updated,
   multi-match, unmatched, skipped (no contact), errors. This is the only
   observability for the first weeks; make it easy to grep. (Per-record unmatched
-  reporting added later — see `SPEC-sf-task-session-link-report.md`.)
+  reporting added later — see `sf-task-session-link-report.md`.)
 - **Deployment**: AWS Batch scheduled job, 1× daily. Exact schedule TBD; running
   after the sales day ends (e.g. 03:00 UTC) keeps the window aligned with "yesterday's
   calls".

@@ -1,3 +1,12 @@
+---
+kind: spec
+status: done
+area: infra
+updated: 2026-07-17
+repos: [udab-server]
+summary: "CI gets a fresh schema-only MySQL sidecar; the Docker image copies pytest.ini so async tests no longer silently skip."
+---
+
 # CI: real MySQL for DB-backed tests + asyncio-mode fix
 
 **Repo**: `udab-server`. Two small, separate PRs — deliberately NOT part of the ZoomInfo-exit PR (#654), whose scope stays as-is.

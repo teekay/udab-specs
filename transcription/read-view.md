@@ -1,6 +1,10 @@
 ---
-date: 2026-07-08
-topic: transcriptions-read-view
+kind: spec
+status: done
+area: transcription
+updated: 2026-07-08
+repos: [udab-server, udab-client]
+summary: "Read-only Transcriptions tab on the Calls page: job list, task drill-down, shared TranscriptViewer, JWT list endpoints."
 ---
 
 # Transcriptions Read View (udab-client)

@@ -1,6 +1,15 @@
+---
+kind: spec
+status: done
+area: zoominfo-exit
+updated: 2026-08-24
+repos: [udab-server]
+summary: "--dry-run --dump-delete-list: per-shard delete-candidate CSV for an admin Data Loader delete, plus a merge script."
+---
+
 # ZoomInfo Exit — Delete-Candidate List Dump (`--dry-run --dump-delete-list`)
 
-**Status: built (2026-08-24, Tomas).** Direction change from `zoominfo-exit-delete-test-batch.md`: instead of (or before) uDab deleting contacts via the API, we hand the SF admin a list of delete-candidate contacts for a bulk delete (Data Loader). That spec's `--delete-contacts` mode is untouched and remains available.
+**Status: built (2026-08-24, Tomas).** Direction change from `delete-test-batch.md`: instead of (or before) uDab deleting contacts via the API, we hand the SF admin a list of delete-candidate contacts for a bulk delete (Data Loader). That spec's `--delete-contacts` mode is untouched and remains available.
 
 ## Decision
 

@@ -1,3 +1,12 @@
+---
+kind: spec
+status: done
+area: dnc
+updated: 2026-07-02
+repos: [udab-server]
+summary: "Add each Active/On Hold account's website domain to its DNC list (reason 'Client Domain'): backfill command + sync hook."
+---
+
 # Feature: Auto-Add Client Domain to Account DNC
 
 ## Overview

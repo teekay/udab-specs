@@ -1,10 +1,19 @@
+---
+kind: spec
+status: done
+area: zoominfo-exit
+updated: 2026-07-21
+repos: [udab-server]
+summary: "Slice 0 dev spec: 5x5 email matcher, decision engine + reason codes, dry-run CLI and reports, legacy pipeline teardown."
+---
+
 # ZoomInfo Exit — Slice 0 Implementation Spec (dev-ready)
 
 > **Status 2026-07-21: MERGED & DEPLOYED** — landed via PR #654 ("Review ZoomInfo prospects/contacts to be removed", commit `9f40b07`), contained in upstream `master`/`stage`/`prod`; follow-up perf commit `0c77571` ("Speedup the ZoomInfo Exit query") on `master`. The `business_email` index (`9d4e1c7a2f38`) is **live on PROD** — verified 2026-07-21 via `SHOW INDEX` on the Aurora read replica (cardinality ~133M). Deploys auto-run migrations (`migrate.sh` gates the ArgoCD image tag on `alembic upgrade head`).
 >
 > *(Superseded status 2026-07-15: implemented on branch `zoominfo-contact-cleanup`, uncommitted, pending Tomas's review + PR.)* All three WPs delivered and verified: 70 new tests green, full suite 3357 passed (1 legacy cleanser test removed — it asserted the deleted `unmatched=True` path), migration chain `9d4e1c7a2f38` (business_email index) → `7e2a9c4d1b30` (drop staging tables) upgrade/downgrade/upgrade verified, CLI smoke-tested end-to-end (dry-run guard exits 1; real dry run over ids 0-200 produced CSV + summary), repo-wide legacy greps clean.
 
-**Repo**: `udab-server`. **Parent doc**: `zoominfo-exit-archive.md` (context, decisions, open questions).
+**Repo**: `udab-server`. **Parent doc**: `archive.md` (context, decisions, open questions).
 **Nature of this slice: strictly informational.** No row in any table is modified, no Salesforce call is made, nothing is deleted or archived. The deliverable is a `--dry-run`-only CLI that classifies prospects and produces a report the CTO can review.
 
 Split into three work packages. WP-A and WP-B share a frozen interface and build in parallel; WP-C runs **after** both are code-complete on the same branch:

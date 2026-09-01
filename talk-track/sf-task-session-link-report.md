@@ -1,6 +1,15 @@
+---
+kind: spec
+status: done
+area: talk-track
+updated: 2026-08-02
+repos: [udab-server]
+summary: "Per-record unmatched report (detail + summary CSV to S3) with diagnosed reasons for the session-link job, both sides."
+---
+
 # Unmatched Report for the SF Task ↔ Talk Track Session Link Job
 
-Follow-up to `SPEC-sf-task-session-link.md` (implemented as
+Follow-up to `sf-task-session-link.md` (implemented as
 `app/commands/sfdc/link_talk_track_sessions.py`).
 
 ## Problem

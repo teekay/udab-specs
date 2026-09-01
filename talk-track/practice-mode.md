@@ -1,3 +1,12 @@
+---
+kind: spec
+status: draft
+area: talk-track
+updated: 2026-07-17
+repos: [udab-server, abstrakt-intelligence-extension]
+summary: "Proposal: AI roleplay practice mode in the talk track iframe via server-mediated Claude SSE and ElevenLabs STT/TTS."
+---
+
 # Talk Track Practice Mode (AI Roleplay)
 
 ## Problem

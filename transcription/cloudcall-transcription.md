@@ -1,3 +1,13 @@
+---
+kind: spec
+status: superseded
+area: transcription
+updated: 2026-07-27
+superseded_by: transcription/v2.md
+repos: [udab-server]
+summary: "Original bulk transcription API: job tables, POST/GET /api/transcription-jobs, Deepgram by URL, S3 .txt, Batch worker."
+---
+
 # CloudCall Recording Transcription
 
 ## Problem

@@ -1,3 +1,12 @@
+---
+kind: spec
+status: done
+area: transcription
+updated: 2026-06-14
+repos: [udab-server, udab-client, abstrakt-intelligence-extension, udab-moonshine-poc]
+summary: "Server-minted short-lived Deepgram tokens for the native app, per-user stt_access/stt_model on sp_extension_version."
+---
+
 # Server-Provisioned Deepgram Keys
 
 ## Problem

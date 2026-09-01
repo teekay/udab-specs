@@ -1,3 +1,12 @@
+---
+kind: spec
+status: in-progress
+area: talk-track
+updated: 2026-08-21
+repos: [udab-server, udab-client]
+summary: "Iteration 1 shipped (exact account autocomplete on the Talk Track list); record type/status filters and roll-up open."
+---
+
 # Talk Track Account Filters (DRAFT)
 
 > **Status: work in progress.** Written from the client's request of 2026-08-17; updated 2026-08-18 with prod-data findings, the client's round-2 answers, and the iteration-1 course correction below. Everything below "Course correction" is background for later iterations — several questions there remain open.

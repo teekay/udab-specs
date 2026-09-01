@@ -1,8 +1,17 @@
+---
+kind: spec
+status: done
+area: transcription
+updated: 2026-08-28
+repos: [udab-server, udab-client]
+summary: "Estimated Deepgram cost per run from sf_task durations, summary matrix, runs/tasks CSV exports (Transcriptions tab)."
+---
+
 # Transcription Spend & Usage Reporting — V1
 
 Status: READY FOR DEV 2026-08-28. Branches: udab-server
 `calc-deepgram-usage-costs`, udab-client `show-deepgram-usage-costs`.
-Builds on SPEC-transcription-auto.md (shipped) and the
+Builds on auto.md (shipped) and the
 `deepgram_request_id` column (shipped 2026-08-27).
 
 ## Requirement (Anna, product, verbatim)
