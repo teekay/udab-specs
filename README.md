@@ -33,7 +33,7 @@ Reading rule: open the area's `NOTES.md` first, then only active specs (draft/re
 
 | doc | kind | status | updated | summary |
 |---|---|---|---|---|
-| [call-queue.md](appointment-emails/call-queue.md) | spec | draft | 2026-09-01 | Analysis for an account-manager queue of transcribed appointment calls; needs audio archiving and client answers Q1-Q17. |
+| [call-queue.md](appointment-emails/call-queue.md) | spec | in-progress | 2026-09-01 | AM list of transcribed appointment calls: audio archive, team sync, API and client page. Built 2026-09-01, unmerged. |
 
 ## ZoomInfo exit
 

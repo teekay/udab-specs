@@ -65,7 +65,7 @@ At most one transcript per SF Task, ever: all job rows for a Task share one S3 k
 - Vendor is derived from the URL host, never stored. The `[Orum]` Subject prefix is unreliable (89% of non-`[Orum]` recording URLs are Orum) and is not used.
 - ~20% of Orum Tasks carry no recording URL at all; Orum has no API, so they are untranscribable. Forward-looking feature: no backfill of old Orum calls; expired recordings surface as `failed` with the Deepgram fetch error (no Deepgram spend).
 - `playback_url()` (same module) is the in-browser player URL (Orum `?raw=true`, CloudCall direct) used by the Appointments page.
-- `Call_Recording_URL_Public__c` is the pipeline's field. The appointment-email matcher (`app/commands/appointment_email/process.py`) prefers `Call_Recording_URL_for_Portal__c` and falls back to Public; **the Portal URL's lifetime is UNVERIFIED** — do not assume it outlives the Public one.
+- `Call_Recording_URL_Public__c` is the pipeline's field. The appointment-email matcher (`app/commands/appointment_email/process.py`) prefers `Call_Recording_URL_for_Portal__c` and falls back to Public. Verified in prod 2026-09-01: the Portal URL is **CloudCall-only** (never Orum), a different endpoint (`/customers/<user>/calls/recordingurl`) with the same `auth=` + `expiryDate=` token scheme — same ~30-day lifetime as the Public URL, no longevity advantage.
 - Dual-channel is assumed everywhere; the worker logs a warning (`_warn_if_not_dual_channel`) when Deepgram metadata reports < 2 channels (labels may be wrong, transcript still stored). Separately, postprocess falls back to per-channel flat text when the response has no `utterances`.
 
 ## CloudCall URL stamper (`app/commands/stamp_cloudcall_urls.py`, `app/services/cloudcall.py`)
@@ -95,7 +95,6 @@ At most one transcript per SF Task, ever: all job rows for a Task share one S3 k
 - The SOQL `LIMIT` runs before claimed-exclusion — hence the separate 10,000 guard + `ORDER BY CreatedDate DESC` for the poller (fresh calls first; a 1,000-cap on already-done rows would starve new ones).
 - `sp_setting` is site-wide configuration (credentials, API keys) only; disposition lists, phrase lists and tolerances are code constants — deploy to change them.
 - Salesforce POSTs occasionally take ~20 s (query-plan variance); use a 60 s+ client timeout. The `/api/*` middleware answers 200 on a bad key.
-- `udab-server/docs/transcription-api-howto.md` still says follow-up and confirmation calls are not included — stale since 2026-08-24 (they are in the constant now).
 - Extension / native-app live transcription (`sp_call_transcript_local`, `deepgram-key-provisioning.md`) is a different pipeline; don't conflate `audio_s3_key` there with this one (which stores no audio).
 - Two workers can still race on the same Task (manual POST + poller tick); cost is one duplicate Deepgram call, never a wrong transcript.
 
