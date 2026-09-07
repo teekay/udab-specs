@@ -87,8 +87,11 @@ Filter definitions:
 
 Audio:
 
-- [ ] **Q9. How long must the play button work?** PENDING — client is
-      finding out (2026-09-01). Today's vendor URLs
+- [x] **Q9. How long must the play button work?** ANSWERED: **45-day
+      retention** (client, 2026-09-01). Implemented as a bucket lifecycle
+      rule on the `call-audio/` prefix (`Expiration.Days: 45`); the API
+      must stop presenting saved audio older than that (see Implemented
+      notes). Original context: Today's vendor URLs
       die in days (Orum) / ~30 days (CloudCall). Lean: propose "as long
       as the transcript" and ask for a retention period.
 - [x] **Q10. Any policy constraint on us holding a second copy of call
@@ -179,9 +182,16 @@ Client (Anna Clare Crews, 2026-09-01):
   Filters do the scoping; **persist each user's last filter set across
   logins** (server-side per-user preference, not localStorage — they
   log in from wherever).
-- Audio retention period: pending (Q9). Copying itself is decided (Q10).
+- **Audio retention: 45 days** (Q9, 2026-09-01). Bucket lifecycle rule
+  on `call-audio/`, days-from-creation. Copying itself decided (Q10).
 
 Tomas (2026-09-01):
+
+- **Terminology (code review): never "archive"/"archived" for call
+  audio.** Nobody keeps an archive here: our S3 copy is a working
+  copy — "saved" (`audio_source: "saved"`, `audio_saved_at`, "Saved
+  copy") — and the vendor's original **expires** (may simply be
+  deleted); UI says "link may have expired".
 
 - **Ownership boundary — this feature is read-only over Dani's code.**
   Summaries/highlights (`call_transcript_generate.py`,
@@ -233,14 +243,16 @@ Tomas (leans, not yet client-confirmed):
    matches**, any status; the link carries the draft status. No draft →
    "no briefing".
 4. **Filters** resolve as: account = `sf_task.AccountId → sf_account`;
-   user = `sf_task.OwnerId → sf_user` (Q6); industry =
+   user = `sf_task.OwnerId → sf_user` (Q6) — reps resolve via
+   the `sf_user` mirror only; whether a rep also has an AIQ account
+   is irrelevant, `sp_user` is not part of this feature; industry =
    `sf_account.Industry` (with `Source_Industry__c` as sub-industry if
    wanted); date = `sf_task.CreatedDate` (Q8); team =
    `sf_user.Partner_Sales_Team__c` of the **account** owner (Q7), once
    synced.
 5. **Sort** on every visible column, server-side, default newest call
    first.
-6. **Play button** = presigned URL to our archived copy when present,
+6. **Play button** = presigned URL to our saved copy when present,
    else `playback_url(recording_url)` (vendor URL, may be dead), else
    disabled. The UI shows which it is.
 7. **Read-only** except highlight editing, which reuses the appointment

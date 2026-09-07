@@ -37,10 +37,13 @@ Reading rule: open the area's `NOTES.md` first, then only active specs (draft/re
 
 ## ZoomInfo exit
 
+- **Living reference:** [zoominfo-exit/NOTES.md](zoominfo-exit/NOTES.md) — read this first.
+
 **Active**
 
 | doc | kind | status | updated | summary |
 |---|---|---|---|---|
+| [archive-defense.md](zoominfo-exit/archive-defense.md) | spec | in-progress | 2026-09-04 | Archived 5x5 persons count as a defense: matcher archive pass, 2 reason codes, indexes. Built 2026-09-04, unmerged. |
 | [archive.md](zoominfo-exit/archive.md) | spec | in-progress | 2026-08-21 | Umbrella: archive ZoomInfo-only prospects and delete SF contacts; decisions, keep rules, slices, open client questions. |
 
 **Done**
