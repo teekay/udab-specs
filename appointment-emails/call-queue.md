@@ -1,15 +1,21 @@
 ---
 kind: spec
-status: in-progress
+status: done
 area: appointment-emails
-updated: 2026-09-01
+updated: 2026-09-11
 repos: [udab-server, udab-client]
-summary: "AM list of transcribed appointment calls: audio archive, team sync, API and client page. Built 2026-09-01, unmerged."
+summary: "AM list of transcribed appointment calls: saved audio, team sync, API and client page. Shipped to prod; round 2 follows."
 ---
 
 # Appointment Call Queue — one list of every transcribed appointment call
 
-Status: ANALYSIS 2026-09-01. Q1/Q4/Q5 answered by Anna Clare Crews
+Status: DONE 2026-09-11 — merged and on prod in both repos (client
+PR #308, server routes on `upstream/prod`; verified via git
+2026-09-11). Client feedback round 2 (pitches in the population,
+transcript export) is specced in
+[call-queue-round-2.md](call-queue-round-2.md).
+
+Original status: ANALYSIS 2026-09-01. Q1/Q4/Q5 answered by Anna Clare Crews
 2026-09-01 (see Decided); Q9 (audio retention) she is finding out; the
 rest not yet sent. Prod profile of the appointment bucket added to
 Analysis §0. No code on `call-queue` (branch = main at 28edfc2).

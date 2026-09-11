@@ -8,6 +8,12 @@ Reading rule: open the area's `NOTES.md` first, then only active specs (draft/re
 
 - **Living reference:** [transcription/NOTES.md](transcription/NOTES.md) — read this first.
 
+**Active**
+
+| doc | kind | status | updated | summary |
+|---|---|---|---|---|
+| [search-endpoint.md](transcription/search-endpoint.md) | spec | ready | 2026-09-09 | Transcript search for the call-quality team: filterable, cursor-paged GET /api/transcripts over produced transcripts. |
+
 **Done**
 
 | doc | kind | status | updated | summary |
@@ -33,7 +39,13 @@ Reading rule: open the area's `NOTES.md` first, then only active specs (draft/re
 
 | doc | kind | status | updated | summary |
 |---|---|---|---|---|
-| [call-queue.md](appointment-emails/call-queue.md) | spec | in-progress | 2026-09-01 | AM list of transcribed appointment calls: audio archive, team sync, API and client page. Built 2026-09-01, unmerged. |
+| [call-queue-round-2.md](appointment-emails/call-queue-round-2.md) | spec | ready | 2026-09-11 | Call queue round 2: pitch calls join the population and Kind filter; per-call and bulk (ZIP) transcript export. |
+
+**Done**
+
+| doc | kind | status | updated | summary |
+|---|---|---|---|---|
+| [call-queue.md](appointment-emails/call-queue.md) | spec | done | 2026-09-11 | AM list of transcribed appointment calls: saved audio, team sync, API and client page. Shipped to prod; round 2 follows. |
 
 ## ZoomInfo exit
 
@@ -69,6 +81,7 @@ Reading rule: open the area's `NOTES.md` first, then only active specs (draft/re
 
 | doc | kind | status | updated | summary |
 |---|---|---|---|---|
+| [edges-and-portals.md](talk-track/edges-and-portals.md) | notes | draft | 2026-09-07 | Design note: Talk Track edges that link to entrypoints, and rethinking entrypoints/portals in the flow graph. |
 | [account-filters.md](talk-track/account-filters.md) | spec | in-progress | 2026-08-21 | Iteration 1 shipped (exact account autocomplete on the Talk Track list); record type/status filters and roll-up open. |
 | [practice-mode.md](talk-track/practice-mode.md) | spec | draft | 2026-07-17 | Proposal: AI roleplay practice mode in the talk track iframe via server-mediated Claude SSE and ElevenLabs STT/TTS. |
 

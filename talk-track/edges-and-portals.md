@@ -1,3 +1,12 @@
+---
+kind: notes
+status: draft
+area: talk-track
+updated: 2026-09-07
+repos: [udab-server, udab-client]
+summary: "Design note: Talk Track edges that link to entrypoints, and rethinking entrypoints/portals in the flow graph."
+---
+
 # Talk Track Edges, Entrypoints, and Portals
 
 Design note for adding "edges that link to entrypoints" to the Talk Track UI,
