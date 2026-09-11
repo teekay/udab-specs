@@ -1,6 +1,6 @@
 ---
 kind: spec
-status: ready
+status: in-progress
 area: appointment-emails
 updated: 2026-09-11
 repos: [udab-server, udab-client]
@@ -9,9 +9,10 @@ summary: "Call queue round 2: pitch calls join the population and Kind filter; p
 
 # Call Queue round 2 — pitches in the population, transcript export
 
-Status: READY 2026-09-11. Client ask 2026-09-09; answers relayed by
-Tomas 2026-09-11; Q1 (filter shape) settled by Tomas the same day —
-no questions open. Builds directly on
+Status: IN-PROGRESS 2026-09-11 — built in both repos on branch
+`call-queue-2`, tests green, PRs pending (see Implemented). Client ask
+2026-09-09; answers relayed by Tomas 2026-09-11; Q1 (filter shape)
+settled by Tomas the same day — no questions open. Builds directly on
 [call-queue.md](call-queue.md) (shipped to prod; see its Implemented
 sections for the code map).
 
@@ -70,9 +71,20 @@ Client ask (2026-09-09, verbatim):
   checkbox selects/deselects the current page. Cap 200 selected
   (matches `per_page` max; keeps the ids-in-query-string request
   ~4 KB, under URL limits).
-- *(lean)* **All rows are checkable**, including untranscribed ones —
-  keeps select-all trivial; the server skips what it can't export.
-  Only the all-skipped case surfaces (no-content → toast).
+- **Only `transcribed` rows are checkable** (settled 2026-09-11, Tomas +
+  Claude; replaces the "all rows checkable" lean). Same predicate as
+  the row download icon. Reasons: "Export selected (n)" then yields
+  exactly n files; there is no transcript-state filter, so a mixed
+  page can't be pre-narrowed; the 200 cap counts only rows that
+  produce a file. Header checkbox selects the page's transcribed
+  rows (checked = all of them selected, indeterminate = some,
+  disabled = none on the page). Disabled boxes carry a title hint
+  ("No transcript to export"). State is a load-time snapshot: a
+  pending row that finishes transcribing becomes checkable on
+  refresh, like its download icon. The server still skips
+  untranscribed ids and returns 204 for all-skipped — ids arrive as a
+  query string and can come from anywhere — but from this UI the
+  path is unreachable (transcripts never regress).
 - *(lean)* **Individual download lives in the table row**: a download
   icon in the Transcript column, shown only on `transcribed` rows.
   (The ask says "from the view".) No flyout button unless asked.
@@ -203,11 +215,10 @@ positionally stable for the client's manual processing.
 ## Implementation plan
 
 Server first (the client change is inert without the wider
-population). Branch `appointment-calls-feedback-round-1` already
-exists in udab-server, cut from master; PR targets
-`abstrakt-mg/udab-server`. udab-client's local `master` is behind
-`upstream/master` (the round-1 UI merged as PR #308) — update before
-branching.
+population). Both repos have a `call-queue-2` branch cut from the
+current `master` (udab-client's master already level with
+`upstream/master`, round-1 UI merged as PR #308). PRs target the
+`upstream` remote of each repo.
 
 1. **udab-server** — population + kinds (the disposition→kind map
    replacing `call_kind`'s substring body and the `KIND_EXPR`
@@ -226,3 +237,88 @@ branching.
 3. Ownership boundary from round 1 holds: everything here is
    read-view code (Tomas's); no summary/highlights/appointment-email
    surface (Dani's) is touched.
+
+## Implemented (2026-09-11)
+
+Branch `call-queue-2` in both repos, cut from `master`. Not yet PR'd.
+Deviations from the Design are noted inline; everything else landed as
+written.
+
+### udab-server
+
+- `app/services/appointment_calls.py`
+  - `PITCH_DISPOSITIONS`, `POPULATION_DISPOSITIONS` (appointment +
+    pitch); `population_filters()` uses the union.
+  - `KINDS` gains `pitch`, `pitch_follow_up`; `KIND_LABELS` (server-side
+    copy of the client labels, for the export header).
+  - `_build_kind_maps()` runs once at import: `KIND_BY_DISPOSITION`
+    (stripped/lowercased string → kind) and `DISPOSITIONS_BY_KIND`
+    (kind → original-cased variants). Pitch bucket classified first.
+    `call_kind()` is a dict lookup; `kind_filter(kinds)` is
+    `CallDisposition IN (variants)`; `KIND_SORT_EXPR` is a `CASE` over
+    the same IN-lists. **Deviation:** the CASE yields the kind *string*
+    (so sort order stays alphabetical, as before) rather than a numeric
+    rank — no behaviour change for existing users. `KIND_EXPR` and the
+    substring `call_kind` body are gone.
+  - Export: `ExportedTranscript` (item + text; `.filename`,
+    `.document`), `export_header()`, `build_export_zip()`,
+    `export_zip_name()`, `load_transcripts(db, ids)` (one
+    `_base_select` for the batch, `_items_for_rows` for state, one
+    query for job-task keys, S3 reads via `to_thread` under an
+    8-wide semaphore, rows in call order). `transcript_text()` is now
+    `load_transcripts` for one id — same key resolution, same 404s.
+- `app/routes/appointment_calls.py`: `GET /appointment-calls/export?ids=`
+  (registered before `/{sf_task_sf_id}` so "export" is not captured
+  as an id; 422 on empty/>200 after de-duplication, 204 when nothing
+  is exportable, else `application/zip`) and
+  `GET /{id}/transcript/download` (`text/plain; charset=utf-8`
+  attachment). **Deviation:** plain `Response` with the in-memory
+  bytes instead of `StreamingResponse` — sets `Content-Length`, and
+  the payload is a few MB at most.
+- Tests (`tests/test_appointment_calls.py`, 45 passing via
+  `scripts/test.sh`): map partitions both buckets and keeps "Pitch
+  Follow-Up" out of `follow_up`; kind filter/sort SQL contains `IN`
+  and no `LIKE`; population includes both pitch kinds; kinds filter
+  for both; filter options list six kinds; export ZIP members/names/
+  header/skips; all-skipped 204; cap 422 (201) and 204 at exactly
+  200; single download headers and body; 404s for pending/outside on
+  both transcript routes; permission on both new routes.
+
+### udab-client
+
+- `src/constants/appointment-calls.js`: `KINDS` + `pitch` (`bg-dark`)
+  and `pitch_follow_up` (`bg-dark-subtle text-dark`);
+  `EXPORT_MAX_SELECTED = 200`; `isExportable(row)`.
+- `src/helpers/udab-api.js`: `download()` returns `false` on 204
+  without saving, `true` otherwise; `downloadAppointmentCallTranscript(id)`,
+  `exportAppointmentCallTranscripts(ids)`.
+- `AppointmentCallsPage.vue`: leading checkbox column (disabled +
+  titled on non-transcribed rows, `@click.stop` so the flyout stays
+  shut), header checkbox with checked/indeterminate/disabled states,
+  selection `Set` cleared only by the filter bar's `apply` (survives
+  sort, page, page-size), cap toast, "Export selected (n)" + "Clear"
+  in the toolbar, download icon next to the `transcribed` badge.
+  Selected rows get `table-active`.
+- Tests (vitest, whole suite 1444 passing): constants (labels,
+  `isExportable`, sanitizer keeps `pitch`), filter bar lists six
+  kinds, page (checkable rows, header states, selection survives
+  paging/sort and clears on filters, cap at 200, export → ids /
+  204 toast / error toast, row download), `download()` 200 vs 204.
+
+### Verified on volume (2026-09-11)
+
+Local DB seeded with `scripts/local/seed_appointment_calls_volume.py`
+(≈445k `sf_task`, 14.8k population rows, 10k transcripts in MinIO) and
+the routes exercised over HTTP with a minted JWT: list (both pitch
+kinds present, `kind` sort), `/filters` lists six kinds, export of a
+200-row page → ZIP with one member per transcribed row (110) and the
+untranscribed / bogus ids skipped, all-untranscribed → 204, 201 ids →
+422, single download with the expected filename, untranscribed → 404.
+Query plans: see NOTES.md "Local testing". Browser pass still to do.
+
+### Follow-ups at PR time
+
+- Round-1 checklist still applies (permission assignment, one-time
+  `sf_user` re-sync, S3 lifecycle rule) if not yet done in prod.
+- Browser pass against a running server (not done in this session:
+  built against the API contract + tests).

@@ -35,11 +35,13 @@ Reading rule: open the area's `NOTES.md` first, then only active specs (draft/re
 
 ## Appointment emails
 
+- **Living reference:** [appointment-emails/NOTES.md](appointment-emails/NOTES.md) — read this first.
+
 **Active**
 
 | doc | kind | status | updated | summary |
 |---|---|---|---|---|
-| [call-queue-round-2.md](appointment-emails/call-queue-round-2.md) | spec | ready | 2026-09-11 | Call queue round 2: pitch calls join the population and Kind filter; per-call and bulk (ZIP) transcript export. |
+| [call-queue-round-2.md](appointment-emails/call-queue-round-2.md) | spec | in-progress | 2026-09-11 | Call queue round 2: pitch calls join the population and Kind filter; per-call and bulk (ZIP) transcript export. |
 
 **Done**
 
