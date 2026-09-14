@@ -41,6 +41,7 @@ Reading rule: open the area's `NOTES.md` first, then only active specs (draft/re
 
 | doc | kind | status | updated | summary |
 |---|---|---|---|---|
+| [consoles-mockup-analysis.md](appointment-emails/consoles-mockup-analysis.md) | notes | draft | 2026-09-14 | Delta analysis of the client's appointment/pitch console mockups vs. what the platform, SF and AI pipeline have today. |
 | [call-queue-round-2.md](appointment-emails/call-queue-round-2.md) | spec | in-progress | 2026-09-11 | Call queue round 2: pitch calls join the population and Kind filter; per-call and bulk (ZIP) transcript export. |
 
 **Done**
