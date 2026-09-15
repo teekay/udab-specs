@@ -9,6 +9,61 @@ summary: "Living reference: how the Appointment Calls queue works today (populat
 
 # Appointment Calls queue — how it works today
 
+## Round 3 (consoles) — built, unmerged (2026-09-15)
+
+On the `call-queue-3` working trees (both repos), not committed. The
+Bucket-1 slice of consoles-mockup-analysis.md:
+
+- **Account owner**: column (sortable, `account_owner_name`), filter
+  (`account_owner_ids` over `SfAccount.OwnerId`), `/filters` gains
+  `account_owners`. The join and item field already existed.
+- **Meeting column + flyout Meeting tab**: the item's
+  `appointment_email` payload gains `occurred_at`, `meeting_type`
+  (contact snapshot `phone_in_person`), `address` (`resolve_address`
+  over the snapshots) and `has_building_image`. Rendered as
+  wall-clock — `appt_scheduled_at` is a local snapshot; the client
+  formats the string (`formatMeetingTime`) instead of `new Date()`,
+  which would shift it into the viewer's zone.
+- **Building image**: `GET /appointment-calls/{id}/building-image`
+  streams the stored `sp_appointment_email_image` bytes (property
+  kind first, map fallback; population-gated, same permission). The
+  client fetches it as an authed blob → object URL. No Google call,
+  no key exposure.
+- **Utterance end times**: `build_transcript_result()` now keeps
+  `end` on every utterance in the stored result JSON — feeds future
+  talk-share metrics; not backfillable, so shipped ahead of need.
+- **Seed**: `seed_appointment_calls_volume.py` now writes
+  `contact_snapshot` (meeting type + address) on seeded emails and a
+  placeholder SVG building image for ~70% of them.
+- Deliberately NOT built yet: meeting-date sort/filter (needs the
+  email join in the access path — perf question), client-safe
+  toggle (nothing to hide yet), highlight timestamps (prompt/QA).
+- **Meeting type source — no meeting entity exists (verified on the
+  PROD replica 2026-09-15).** The SF org models a booked appointment
+  as mutable fields ON the person (`Appt_Scheduled_*` +
+  `Phone_In_Person__c` on Contact; `Appt_*` also on Lead), one
+  current appointment per person, overwritten on reschedule — hence
+  the email pipeline's ContactHistory trigger + snapshot. SF Events
+  (`sf_event`, 250k rows mirrored) are pitch-activity records
+  (`Type='Pitch'`), not booked meetings, and carry no meeting-type
+  field. `sf_contact` does not sync `Phone_In_Person__c`; the
+  briefing `contact_snapshot` is the only local copy. PROD values
+  over 5,391 emails: In Person 2,160 / Phone 1,693 / **Virtual 476**
+  (not in the mockups) / null 1,062. Per-client default lives on
+  `sf_qualified_appointment_sheet.Appointment_Process_Phone_or_In_Person__c`
+  (3,096 of 8,565 filled).
+  **Consequence:** `sp_appointment_email` is the de-facto meeting
+  entity (one immutable row per booking flip). A meeting-type filter
+  should promote `meeting_type` to a real indexed column on that
+  table — stamped at creation, backfilled locally from existing
+  snapshots (thousands of rows, one UPDATE, no SF re-sync). Do NOT
+  add it to the `sf_contact` mirror: wrong grain (mutable per-person
+  current value) and backfill would need an 11.4M-row contact
+  re-sync. Meeting-date sort/filter rides the same join work
+  (`appt_scheduled_at` is already a real column).
+- Meeting data only exists for calls matched to a briefing; pitch
+  rows show a dash by design.
+
 Living doc. Update it when a decision or gotcha lands; the specs in this
 folder are history. Paths are `udab-server/` unless stated. Verified
 against the code on 2026-09-11 (branch `call-queue-2`). The appointment
