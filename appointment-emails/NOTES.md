@@ -9,6 +9,20 @@ summary: "Living reference: how the Appointment Calls queue works today (populat
 
 # Appointment Calls queue — how it works today
 
+## Round 4 ("Download all") — built, unmerged (2026-09-22)
+
+On branch `btn-download-all-transcripts` (both repos), not committed;
+spec: [call-queue-download-all.md](call-queue-download-all.md). A
+dedicated permission (`Download All Appointment Calls`) shows a button
+that zips **every transcribed call matching the current filters** in
+an AWS Batch job (`appointment-calls-export`), no table: the `POST`
+pre-signs the 7-day download URL up front, the job writes a status
+JSON next to the ZIP under `exports/appointment-calls/`, the page
+polls and keeps the job in localStorage. The selected-rows export and
+the job share one pipeline (`ExportArchive`, `iter_export_batches`,
+`run_export`); `EXPORT_S3_CONCURRENCY` is 10 (boto3's pool size).
+Merge checklist in the spec's "Follow-ups at PR time".
+
 ## Round 3 (consoles) — built, unmerged (2026-09-15)
 
 On the `call-queue-3` working trees (both repos), not committed. The
@@ -159,6 +173,12 @@ work-state, no lifecycle, no writes — filters persisted per user via
 
 ## Gotchas
 
+- Long-running read jobs (the "download all" export, anything chunked
+  over the reader session): `commit()` between chunks. SQLAlchemy
+  autobegins a REPEATABLE READ transaction on the first query and
+  keeps it until the session closes; on Aurora a read view held open
+  on a reader pins undo purge on the writer. Read-only, so commit is
+  free.
 - Route order matters: `/export` and `/filters` are registered before
   `/{sf_task_sf_id}`.
 - `transcript_text()` is `load_transcripts()` for one id — don't loop
