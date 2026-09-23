@@ -41,6 +41,7 @@ Reading rule: open the area's `NOTES.md` first, then only active specs (draft/re
 
 | doc | kind | status | updated | summary |
 |---|---|---|---|---|
+| [call-queue-sales-enablement.md](appointment-emails/call-queue-sales-enablement.md) | spec | draft | 2026-09-23 | Sales Enablement calls in the call queue: third tab over a rep-department population, no client account, own columns. |
 | [call-queue-download-all.md](appointment-emails/call-queue-download-all.md) | spec | in-progress | 2026-09-22 | Download all: Batch job zips every transcribed call matching the queue filters to S3; pre-signed URL, no table. |
 | [consoles-mockup-analysis.md](appointment-emails/consoles-mockup-analysis.md) | notes | draft | 2026-09-14 | Delta analysis of the client's appointment/pitch console mockups vs. what the platform, SF and AI pipeline have today. |
 | [call-queue-round-2.md](appointment-emails/call-queue-round-2.md) | spec | in-progress | 2026-09-11 | Call queue round 2: pitch calls join the population and Kind filter; per-call and bulk (ZIP) transcript export. |

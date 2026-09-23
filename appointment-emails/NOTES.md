@@ -9,6 +9,18 @@ summary: "Living reference: how the Appointment Calls queue works today (populat
 
 # Appointment Calls queue — how it works today
 
+## Round 5 (Sales Enablement tab) — draft, questions with the client (2026-09-23)
+
+Spec: [call-queue-sales-enablement.md](call-queue-sales-enablement.md).
+The client asked for 16 Sales Enablement reps "under Reps"; prod shows
+their calls are all on Prospect-status accounts or bare Leads, so the
+`Active` rule drops every one. Proposed: a third tab over a second
+population (`population=sales_enablement`, rep `Department`), not a
+relaxed rule. Tab, department rule, Lead-only calls, same permission,
+columns and export decided by Tomas 2026-09-23; open with the client
+2026-09-24: whether an SE "Appointment" is an appointment booked for
+an Abstrakt AE (decides if the Kind labels apply). Nothing built.
+
 ## Round 4 ("Download all") — built, unmerged (2026-09-22)
 
 On branch `btn-download-all-transcripts` (both repos), not committed;
