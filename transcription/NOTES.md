@@ -2,7 +2,7 @@
 kind: notes
 status: done
 area: transcription
-updated: 2026-09-01
+updated: 2026-09-23
 repos: [udab-server, udab-client]
 summary: "Living reference: how the transcription pipeline works today; specs are history."
 ---
@@ -97,10 +97,16 @@ At most one transcript per SF Task, ever: all job rows for a Task share one S3 k
 - Salesforce POSTs occasionally take ~20 s (query-plan variance); use a 60 s+ client timeout. The `/api/*` middleware answers 200 on a bad key.
 - Extension / native-app live transcription (`sp_call_transcript_local`, `deepgram-key-provisioning.md`) is a different pipeline; don't conflate `audio_s3_key` there with this one (which stores no audio).
 - Two workers can still race on the same Task (manual POST + poller tick); cost is one duplicate Deepgram call, never a wrong transcript.
+- **Claimed-exclusion (incl. the 6 h failed-retry gate) is poller-only.** The API POST path calls `create_job` without `exclude_claimed`, so a manual POST re-attempts failed tasks immediately; its only dedup is "completed with a transcript key". (Verified 2026-09-18.)
+- **`Task.AccountId` is volatile** — it derives from the contact's Account, and clients like Software Advice move contacts between sub-accounts constantly. Never re-target a specific Task by a snapshotted `accountId`; use `contactId` (WhoId, stable). Account-scoped re-POSTs silently miss moved tasks (no rows, no errors). Exports label account "as of export time".
+- CloudCall `GET /v2/customers/{user}/calls` returns **HTTP 500 if the username is percent-encoded** in the path (`@` → `%40`); pass it raw as `app/services/cloudcall.py` does. Listing-minted `CallRecordingURL`s honour their `expiryDate=` (~30 days).
+- Orum retention is not reliably "days": on 2026-09-23 (job 3251, Alliance Maintenance backfill) all 9 Orum appointment recordings from Mar–May 2026 fetched fine and transcribed. Don't tell a client old Orum calls are lost without trying the POST first — a failed fetch costs nothing.
+- CloudCall URLs with `URL_Expiry_Time__c IS NULL` are dead (verified 8/8, 2026-09-18) — ~25–30 % of all CloudCall tasks Jan–Aug 2026, near zero from September. Nothing in udab-server writes that field; see `cloudcall-url-heal.md`.
+- Presigned transcript URLs can fail with S3 `ExpiredToken` well before the 7-day TTL (server STS session expiry) — download right after minting; re-mint via `GET /api/sf-tasks/{id}/transcript`.
 
 ## Open threads
 
-- Refreshing expired CloudCall URLs (30-day shelf life) — the stamper's resolution path could do it; the fetch-on-demand design in `v2.md` slice 4 is the better home if needed.
+- Refreshing expired CloudCall URLs — findings, a completed one-off recovery (485/489 by exact call-id match) and the proposed stamper patch (stamp `URL_Expiry_Time__c`; rolling refresh selector) live in `cloudcall-url-heal.md`; gated on client IT confirming what changed ~2026-09-01.
 - Per-end-client `keyterm` vocabulary — no source decided (SF custom field vs collation); `keyterm` is nova-3-only and httpx `params` must be a list of tuples to repeat it.
 - Call grade / opportunity grade — columns reserved in `../appointment-emails/call-queue.md` (lean), producer undecided (Q17 there).
 - Audio archiving at transcription time (we hold no bytes today) — proposed in `../appointment-emails/call-queue.md` §2, needs a policy answer on retaining a second copy.

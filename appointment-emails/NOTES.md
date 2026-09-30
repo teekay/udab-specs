@@ -2,12 +2,111 @@
 kind: notes
 status: done
 area: appointment-emails
-updated: 2026-09-11
+updated: 2026-09-30
 repos: [udab-server, udab-client]
 summary: "Living reference: how the Appointment Calls queue works today (population, kinds, transcript state, export); specs are history."
 ---
 
 # Appointment Calls queue — how it works today
+
+## Filter bar aligned with Talk Track Adherence — built locally, unmerged (2026-09-30)
+
+Client asked that a filter over the same data look and work the same on
+every page. The Hub's filter bar now uses the Adherence chrome; the
+Adherence page changed only by extraction (no functional change).
+Client-only; no server or data change.
+
+- **Shared pieces** (`udab-client/src/components/reports/`):
+  `report-theme.css` (the `--report-*` palette, light + dark, on
+  `.report-theme`), `ReportFilterPanel.vue` (card, heading, optional
+  `actions` slot, `row g-3` body — controls go in `col-md-3`, a
+  `.filter-break` div forces a new row), `ReportSelect.vue` (native
+  select wrapper with the caret), `ReportDateRange.vue` (the popover,
+  formerly `AdherenceDateRange`; `id-prefix` names its elements,
+  `all-time-unbounded` makes "All time" clear both dates, emits `change`
+  once on close when something moved). `useReportPeriod` (composable)
+  holds the preset ↔ dates logic and the once-a-minute Central-day
+  re-resolve; `onApply` fires when the tick moved the dates.
+- **Hub filter state**: `dateRange` → `period` / `startDate` / `endDate`
+  (default `all_time`, no bounds). Stored preferences are migrated on
+  read (legacy pair → custom range; a stored preset is re-resolved
+  against today, so "This month" follows the calendar).
+- **Day bounds are Central now.** The list and export send
+  `date_from` / `date_to` as UTC instants of Central midnight and
+  23:59:59.999 (`centralDayStart` / `centralDayEnd` in
+  `report-periods.js`); the server's `parse_date_bound` already takes
+  the inclusive datetime path for these. Before, bare dates were read
+  as UTC days while the column said CST.
+- **Deliberately kept from the Hub, not Adherence**: commit on dropdown
+  close, debounced search, Clear filters, per-user persistence,
+  population-wide options (Adherence scopes options to the range).
+- **Not aligned (decisions pending)**: Team stays the account owner's
+  team over raw picklist values (Adherence: rep's team, active teams
+  only, cascading rep roster); custom "To" is not clamped to today.
+- Placement: the panel sits inside the Hub card under the view pills
+  (title "Filters"); Adherence keeps its own card. Might move later.
+- Order mirrors Adherence: call attributes first (Called, Kind,
+  Recording, Search), then identities (Team, Rep, Account, Account
+  owner, Industry), then the "Coming soon" placeholders.
+
+## Call insights (AI extraction) — built locally, unmerged (2026-09-25)
+
+Spec: [call-insights.md](call-insights.md) (its Implemented section is the
+code map). Adherence-pattern feature: `sp_call_insight` (+ `_item`),
+`call-insights-generate` sweeper, Sonnet via `app/services/bedrock.py`,
+console item gains `insights`; client renders it in the table
+(`AppointmentCallInsightCell.vue`), a flyout Insights tab, and a
+client-safe switch that hides coaching and flags.
+
+- **No local real-model path.** Local boto3 carries MinIO credentials, so
+  the sweeper cannot reach Bedrock from the dev stack. A provider switch
+  to the Anthropic API was built and dropped (dependency churn; see the
+  spec). Prompt iteration happens in `udab-call-insights-poc/`; the
+  server is tested against mocks. If the switch is ever revived: the SDK
+  needs typing_extensions>=4.14, anyio>=4.10, idna>=3.18, h11>=0.16 with
+  httpcore>=1.0.9, and Brotli>=1.2.0.
+- **Kind comes from the disposition map**, not from the transcript row's
+  `context_kind` (which means "appointment-email draft exists").
+- **Deterministic corrections live in code, not the prompt**: swapped
+  speaker labels are repaired before prompting (46+ calls in the booking
+  corpus have them), asks after the agreement turn are dropped, stray
+  quotation marks stripped. The model's own `speaker_labels_suspect` is
+  kept as a secondary signal.
+- **Local sample from production**: after `load_sample_calls.py`, run
+  `scripts/local/sync_sample_from_prod.py` (host, VPN up, venv python) to
+  copy the rows that surround the sample calls from the prod read replica:
+  real contacts (company, email, mailing address; the sample tasks are
+  re-pointed at them), later calls on those contacts, quality scorecards,
+  adherence rows, Dani's summaries and highlights, and briefings with their
+  images. Everything on the console then renders from production data
+  except talk share (transcript JSON lives in S3, unreachable locally).
+- **Local sample**: `scripts/local/load_sample_calls.py --tier core|wide|all`
+  loads the PoC eval sets (real transcripts) as SF mirror rows; `--clean`
+  removes them (marker `SMPL` in synthetic account/user/contact ids; task
+  ids are the real SF ids). The volume seed's 14k fake transcripts are
+  also eligible for the sweeper — always pass `--sf-task-id` locally.
+- Gotcha: `.txt`-only transcripts (pre-JSON era and the local sample) give
+  no `end` offsets, so `rep_talk_share_pct` is null for them.
+- **Console columns that need no model** (2026-09-29): Company =
+  contact `Company__c` (lead `Company`); DARTS = newest
+  `sf_quality_scorecard` for the contact with `Appt_Date__c` within 60
+  days after the call (scorecards never reference the Task; ~5 reviewer
+  rows per appointment); Talk track adherence = completed
+  `sp_call_adherence.adherence_pct`; Callback = first later `Call` task
+  on the same contact (Salesforce follow-up tasks are essentially never
+  logged: 1 open future task across 26k recent pitch contacts). All
+  scalar subqueries on the list query.
+- **Prompt r5** (supersedes r4 before merge): attendees (items), heat 0–5,
+  objection handling, coaching note on bookings, timestamped moments
+  (`start_seconds` on items, `agreement` item kind) — one migration
+  `b8d4f0a1c2e3`; regrade after deploy. Scorecard components exposed as
+  `scorecard` on the console item (no per-letter DARTS in Salesforce).
+- **Building satellite fallback**: contact mailing address → Static Maps →
+  S3 `building-images/{task}/{addr-hash}.png`; 7-day lifecycle rule on the
+  prefix is the only invalidation (deploy checklist).
+- Local gotcha: the dev API container runs uvicorn **without `--reload`**;
+  service/route edits need `docker compose restart fastapi` before the
+  page reflects them (tests and `python -c` checks are unaffected).
 
 ## Round 5 (Sales Enablement tab) — draft, questions with the client (2026-09-23)
 
@@ -34,6 +133,29 @@ polls and keeps the job in localStorage. The selected-rows export and
 the job share one pipeline (`ExportArchive`, `iter_export_batches`,
 `run_export`); `EXPORT_S3_CONCURRENCY` is 10 (boto3's pool size).
 Merge checklist in the spec's "Follow-ups at PR time".
+## Round 3b — mockup-shaped presentation (2026-09-16, uncommitted)
+
+Client-demo requirement: the page must *read* as the mockups taking
+shape. Client-side only, on top of round 3:
+
+- **Appointments | Pitches view switch** (nav pills) on the one page,
+  mirroring the mockups' two consoles. Each view scopes the kinds
+  bucket (the request now always sends `kinds`), restricts the Kind
+  filter's options, and persists in view preferences (`view`).
+- **Columns reordered/relabeled to the mockups** per view; built
+  columns show real data, unbuilt ones a dashed **"Coming soon"**
+  chip whose tooltip says what's pending (scorecard / AI phase /
+  SF source). Mockup filters not built yet render as disabled
+  "Coming soon" controls (grade; callback status / meat on the
+  bone / asks).
+- Our own columns (Kind, Transcript, Summary, Briefing) trail after
+  the mockup set; selection/export unchanged. Header is no longer
+  sticky — the mockup-wide table always horizontal-scrolls, and
+  sticky can't survive an overflow wrapper.
+- "Rep and owner" is one column (rep main; account owner · team
+  sub), sorted by rep; account-owner sort still available via API.
+  "Meeting date" sorts by call date until meeting-date sort lands
+  (tooltip says so).
 
 ## Round 3 (consoles) — built, unmerged (2026-09-15)
 
@@ -106,10 +228,14 @@ work-state, no lifecycle, no writes — filters persisted per user via
 - **Population** (`population_filters()`): `sf_task` rows with
   `TaskSubtype = Call`, not deleted, `CallDisposition IN` the
   appointment **and pitch** buckets of `CALL_DISPOSITION_MAP`, on a
-  Pipeline Client / Active account, `CreatedDate >= 2026-08-25 13:35 UTC`
-  (`APPOINTMENT_CALLS_SINCE`, first auto-transcribe run — earlier
-  calls were never transcribed and their vendor audio has expired, so
-  no backfill is possible). Served by
+  Pipeline Client / Active account, `CreatedDate >= 2026-01-01 UTC`
+  (`APPOINTMENT_CALLS_SINCE`; was the 2026-08-25 13:35 poller go-live
+  until 2026-09-23, when per-account backfills of older calls proved
+  possible — CloudCall URLs re-mint by call id, Orum audio from March
+  still fetched — and the client asked to see them here. Prod
+  population at the change: ~26k rows since go-live, ~176k since
+  2026-01-01, ~406k with no floor; 2025 and earlier have zero
+  transcripts, so the floor stays at 2026). Served by
   `ix_sf_task_disposition_created (CallDisposition, CreatedDate)`.
 - **Kinds** — `booking | confirmation | follow_up | reschedule | pitch |
   pitch_follow_up`. Derived once at import from the fixed disposition
