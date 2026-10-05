@@ -42,6 +42,8 @@ Reading rule: open the area's `NOTES.md` first, then only active specs (draft/re
 
 | doc | kind | status | updated | summary |
 |---|---|---|---|---|
+| [hub-sorting.md](appointment-emails/hub-sorting.md) | spec | in-progress | 2026-10-06 | Every Hub column but Callback sorts; built on hub-sorting (both repos), scorecard index migration, PROD timings and A/B. |
+| [hub-performance.md](appointment-emails/hub-performance.md) | spec | in-progress | 2026-10-02 | Hub load time: every page-load query timed on PROD, rewrites timed on the replica, covering index A/B done locally. |
 | [call-insights.md](appointment-emails/call-insights.md) | spec | in-progress | 2026-09-30 | Per-call structured insights from transcripts: PoC done, V1 built locally on the adherence pattern; awaiting review. |
 | [call-queue-sales-enablement.md](appointment-emails/call-queue-sales-enablement.md) | spec | draft | 2026-09-23 | Sales Enablement calls in the call queue: third tab over a rep-department population, no client account, own columns. |
 | [call-queue-download-all.md](appointment-emails/call-queue-download-all.md) | spec | in-progress | 2026-09-22 | Download all: Batch job zips every transcribed call matching the queue filters to S3; pre-signed URL, no table. |

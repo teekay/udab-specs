@@ -2,12 +2,119 @@
 kind: notes
 status: done
 area: appointment-emails
-updated: 2026-09-30
+updated: 2026-10-06
 repos: [udab-server, udab-client]
 summary: "Living reference: how the Appointment Calls queue works today (population, kinds, transcript state, export); specs are history."
 ---
 
 # Appointment Calls queue — how it works today
+
+## Hub sorting on every column but Callback — built locally, unmerged (2026-10-06)
+
+Spec: [hub-sorting.md](hub-sorting.md) (PROD timings per candidate,
+scorecard index A/B). Branch `hub-sorting` in both repos.
+
+- **Sorting needs no index on the sorted column here.** The key select
+  ranges `sf_task` on `ix_sf_task_disposition_created`, joins or
+  subqueries the sort value per population row and filesorts; the sort
+  column always lives on another table, so only the lookup index into
+  that table matters, and every candidate had one. Cost is the lookup's
+  rows per task × the (period-bounded) population.
+- **Callback is the one column that cannot sort cheaply**: no row stores
+  "next call on this contact", it is a self-join on `sf_task` that
+  walks ≈ 24 tasks per contact (PROD: 2.9 s for a month of pitches,
+  26 s all time). Showing it costs ≈ 50 ms per 200-row page because the
+  item subqueries run per page row only. Sort it only after
+  materialising `next_call_at` on the task (sweeper).
+- **Scorecard sorts** (grade, DARTS) walk the contact's scorecards per
+  task; `ix_sf_quality_scorecard_contact_type_date` (migration
+  `c7e2a9d4f153`) cuts the rows read from ≈ 24 to < 1 on PROD data
+  (projected all time ≈ 4 s → ≈ 1 s; local A/B −46 % grade, −24 %
+  DARTS).
+- **Key select carries the sort value** (`sort_N` labels) so the outer
+  page orders by `page_keys.sort_N` and never re-evaluates a subquery or
+  needs the sort's join. Ordering by a select-list alias is
+  plan-neutral on MySQL 8 (timed).
+- **Nulls last in both directions** for insight, scorecard, email and
+  adherence sorts (`NULLS_LAST_SORTS`): most rows have no value.
+  Picklists (agreement to meet, objection handling) rank by meaning via
+  a `CASE`, not alphabetically; keep `AGREEMENT_ORDER` /
+  `OBJECTION_HANDLING_ORDER` in step with the client badge sets.
+- Client: score and date columns open descending (`firstSortDir`),
+  names ascending.
+- Not built, noted: column hiding (Excel-style, per user) as its own
+  feature — the client's "can't get everything in one view" ask.
+
+## Hub query shape after the performance pass — built locally, unmerged (2026-10-01)
+
+Spec: [hub-performance.md](hub-performance.md) (PROD measurements, the
+rewrites timed on the replica, the covering-index A/B). Branch
+`hub-performance` in udab-server and in udab-client (off
+`upstream/master`); no migration.
+
+- **Default period is "This month"** (client ask, 2026-10-02):
+  `DEFAULT_PERIOD` in `src/constants/appointment-calls.js`;
+  `defaultFilters(today)` resolves its dates, so Clear filters and a
+  first visit are bounded. A stored view with no period and no dates
+  (including the pre-preset shape) falls back to it; only an explicit
+  `period: "all_time"` is unbounded. The API is unchanged: no date
+  params still means all time. This is the biggest first-load win —
+  PROD default-view SQL ≈ 0.84 s → ≈ 0.14 s (appointments), ≈ 2.3 s →
+  ≈ 0.38 s (pitches).
+- **Count runs alongside the page query.** The list route takes a
+  second reader session (`Depends(get_async_readonly_db,
+  use_cache=False)`) and `list_calls(..., count_db=)` gathers the two
+  statements; with one session (tests, other callers) it stays
+  sequential. Wait = max(count, page) instead of the sum; matters on
+  wide ranges. Each list request holds two pooled reader connections
+  for its duration.
+
+- **Page = keys first, items second.** `list_calls` sorts and limits a
+  slim id select (`_population_select`, only the joins the filters and
+  the sort reference, see `ListFilters.joins()` / `sort_joins()`), then
+  `_base_select(keys)` joins the item columns and the seven correlated
+  subqueries onto that page of ids. Any sort other than `called_at`
+  used to evaluate every subquery for the whole population before
+  sorting (PROD: 8–57 s); now ≈ 0.5–2 s.
+- **Count takes only the joins its criteria need.** MySQL never drops
+  an unused outer join; `teams` needs the account owner, `search` the
+  owner/contact/lead, everything else none. −40–45 % on PROD counts.
+- **`/filters` is one pass + a 5-minute per-process cache**
+  (`FILTER_OPTIONS_TTL_SECONDS`): distinct `(AccountId, OwnerId)` pairs
+  over the task side of the population, then the account rule and name
+  lookups on that small set; the five lists are sorted in Python with a
+  casefold key (the collation is case-insensitive). Tests call
+  `reset_filter_options_cache()` between cases. PROD: 19 s → ≈ 1.2 s
+  uncached.
+- **GET routes use `get_async_readonly_db`** (reader endpoint, pool
+  20 + 30); the export `POST` stays on the writer. The test harness
+  overrides both dependencies.
+- `population_filters()` is now `task_population_filters() +
+  account_population_filters()`, so a task-only pass can be built.
+- Local data: `scripts/local/seed_appointment_calls_enrich.py` adds
+  scorecards, adherence and insights to the volume seed so the per-row
+  subqueries have rows to hit; `explain_appointment_calls.py` compiles
+  the new statements (including the one-pass `/filters`).
+- Not done, by decision: the `sf_task` covering index (≈ 1.5 GB on
+  PROD for another ≈ 2× on counts and an uncached `/filters`).
+- **What this pass does not change: first paint of the default view.**
+  The default `called_at` sort was already "sort first, subqueries for
+  one page"; the branch saves only the count's unused joins there
+  (local, last month, 200/page: 503 ms → 455 ms server). First paint is
+  dominated by things outside SQL — see "First paint, measured" in the
+  spec.
+- **Local gotcha — collation drift.** PROD's `sf_task.WhoId` is
+  `latin1_swedish_ci`, matching the scorecard model's `Contact__c`; the
+  local `sf_task` is `utf8mb4_general_ci`. With mismatched collations
+  the scorecard subqueries cannot use `ix_sf_quality_scorecard_contact`
+  and the local page costs 3–4 s instead of 0.5 s. The enrich seed
+  now aligns the local scorecard column to `sf_task.WhoId`'s collation;
+  PROD needs nothing. Bulk inserts also leave InnoDB stats stale for a
+  while (the seed runs `ANALYZE TABLE`).
+- Follow-up candidate: the `transcript_state` sort still runs its four
+  job-task subqueries per population row inside the id select (PROD
+  1.25 s, local 2 s); a LEFT JOIN to a "latest job task per Task"
+  derived table would drop that to the default sort's cost.
 
 ## Filter bar aligned with Talk Track Adherence — built locally, unmerged (2026-09-30)
 
@@ -28,7 +135,8 @@ Client-only; no server or data change.
   holds the preset ↔ dates logic and the once-a-minute Central-day
   re-resolve; `onApply` fires when the tick moved the dates.
 - **Hub filter state**: `dateRange` → `period` / `startDate` / `endDate`
-  (default `all_time`, no bounds). Stored preferences are migrated on
+  (default was `all_time`; **`this_month` since 2026-10-02**, see the
+  performance pass above). Stored preferences are migrated on
   read (legacy pair → custom range; a stored preset is re-resolved
   against today, so "This month" follows the calendar).
 - **Day bounds are Central now.** The list and export send
@@ -104,9 +212,15 @@ client-safe switch that hides coaching and flags.
 - **Building satellite fallback**: contact mailing address → Static Maps →
   S3 `building-images/{task}/{addr-hash}.png`; 7-day lifecycle rule on the
   prefix is the only invalidation (deploy checklist).
-- Local gotcha: the dev API container runs uvicorn **without `--reload`**;
-  service/route edits need `docker compose restart fastapi` before the
-  page reflects them (tests and `python -c` checks are unaffected).
+- Local dev API **does auto-reload**: the container runs
+  `watchmedo auto-restart --pattern='*.py' -- uvicorn …`, so any `.py`
+  change under `/app` (an edit, a branch switch) restarts the server
+  process within a second or two. No `docker compose restart` needed.
+  The container's own uptime does not change on a reload, so it says
+  nothing about which code is loaded; check `docker logs` for
+  "Started server process". (Corrected 2026-10-02: this note used to
+  claim there was no reload. In-process state such as the `/filters`
+  cache is lost on every reload.)
 
 ## Round 5 (Sales Enablement tab) — draft, questions with the client (2026-09-23)
 
