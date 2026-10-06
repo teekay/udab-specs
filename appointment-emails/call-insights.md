@@ -1,15 +1,15 @@
 ---
 kind: spec
-status: in-progress
+status: done
 area: appointment-emails
-updated: 2026-09-30
+updated: 2026-10-06
 repos: [udab-server, udab-client]
 summary: "Per-call structured insights from transcripts: PoC done, V1 built locally on the adherence pattern; awaiting review."
 ---
 
 # Call insights — structured per-call extraction for the Appointments / Pitches views
 
-Status: IN-PROGRESS 2026-09-25 — V1 built locally in both repos on branch `llm-call-transcript-extraction` (uncommitted; Tomas reviews Sunday 2026-09-27). PoC rounds 1–3 done; see PoC log. Original framing follows. Client
+Status: DONE — shipped as udab-server #778 (+ #783 leftovers) and udab-client #335 (status corrected 2026-10-06; the line used to say "built locally, uncommitted"). PoC rounds 1–3 done; see PoC log. Original framing follows. Client
 ask arrived 2026-09-24 as "Appointment/Pitch Queue: Account Mgmt Hub"
 (a per-column definition list for the two views). It narrows Bucket 3
 of [consoles-mockup-analysis.md](consoles-mockup-analysis.md) to a

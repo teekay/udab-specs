@@ -1,8 +1,8 @@
 ---
 kind: spec
-status: in-progress
+status: done
 area: appointment-emails
-updated: 2026-10-06
+updated: 2026-10-07
 repos: [udab-server, udab-client]
 summary: "Every Hub column but Callback sorts; built on hub-sorting (both repos), scorecard index migration, PROD timings and A/B."
 ---
@@ -61,9 +61,24 @@ scorecard index as a migration.
 - Not built: Callback sort (see Options 4), column hiding (separate
   feature, see top).
 
-Open at PR time: run the migration from a local session if Argo is
-slow on it (it should not be), then time grade / DARTS on the PROD
-reader with the statements in the scratchpad or the explain script.
+
+## Shipped (2026-10-07)
+
+Deployed to PROD. Argo did not run the migration (reader still showed
+`b8d4f0a1c2e3` and no index after the deploy); DevOps ran it by hand,
+verified on the reader: `alembic_version = c7e2a9d4f153`,
+`ix_sf_quality_scorecard_contact_type_date` present. Same statements
+as the table above, PROD reader, index in use (0.7–1.3 rows per
+lookup instead of 24):
+
+| sort | before | after |
+|---|---|---|
+| grade, September | 486 ms | 117 ms |
+| grade, all time | 3,838 ms | 825 ms |
+| DARTS, September | 505 ms | 106 ms |
+| DARTS, all time | 4,023 ms | 859 ms |
+
+Grade and DARTS now sit in the same band as the name and insight sorts.
 
 ## Why sorting does not need new indexes here
 

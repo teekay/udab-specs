@@ -1,15 +1,15 @@
 ---
 kind: spec
-status: in-progress
+status: done
 area: appointment-emails
-updated: 2026-09-22
+updated: 2026-10-06
 repos: [udab-server, udab-client]
 summary: "Download all: Batch job zips every transcribed call matching the queue filters to S3; pre-signed URL, no table."
 ---
 
 # Call Queue — "Download all" (filter-driven bulk transcript export)
 
-Status: IN-PROGRESS 2026-09-22 — design agreed with Tomas (no table,
+Status: DONE — shipped as udab-server d987f75, udab-client cb937b1 (status corrected 2026-10-06). Original line: design agreed with Tomas (no table,
 same ZIP format, soft ceiling, pre-signed URL + localStorage, dedicated
 permission, shared export pipeline) and **built the same day in both
 repos on branch `btn-download-all-transcripts`, uncommitted, awaiting

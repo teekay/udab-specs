@@ -2,14 +2,46 @@
 kind: notes
 status: done
 area: appointment-emails
-updated: 2026-10-06
+updated: 2026-10-07
 repos: [udab-server, udab-client]
 summary: "Living reference: how the Appointment Calls queue works today (population, kinds, transcript state, export); specs are history."
 ---
 
 # Appointment Calls queue — how it works today
 
-## Hub sorting on every column but Callback — built locally, unmerged (2026-10-06)
+## Empty cells: what a dash means — draft spec (2026-10-06)
+
+Spec: [hub-empty-cells.md](hub-empty-cells.md). Client wants "—"
+replaced by a reason. Five classes of empty (not on the call / not yet
+/ never / blank in SF / a bug), counted on PROD; one word per cause.
+**Built 2026-10-06 on branch `hub-empty-cells` in both repos,
+uncommitted.** Rule: "N/A" only where the column cannot apply to the
+row (briefing columns on non-booking kinds, talk share before
+2026-09-15); everything else names what is missing. Adherence column
+hidden on the Pitches view. New item field `review_window_open`.
+
+- **Bug, fixed on the branch:** transcribed calls under `MIN_CALL_SECONDS` (20) never
+  get an `sp_call_insight` row (`_select_work` filters them out), and
+  the client reads "transcribed, no row" as Pending — 404 calls on
+  PROD show "Pending" forever. Fix in the sweeper, not the API.
+- **Sweeper leak, fixed on the branch:** `_select_work` selects every disposition in
+  `CALL_DISPOSITION_MAP` (Gatekeeper, Contact, Left Live Message
+  included); `kind_for()` rejects them as `unsupported_disposition`.
+  610 wasted rows, ~300/month.
+- Model nulls are findings: every prompt field says "Null if none was
+  stated", so "Not stated" is the truthful cell text; on PROD Budget
+  is null on 84 % of completed appointment insights, Competition 61 %.
+- Scorecards: a Pipeline card exists at booking but gets stars after
+  the meeting; this month 618 of 934 appointment calls have a card and
+  0 have stars. "Not scored yet" vs "Not scored" must split on the
+  60-day window (`SCORECARD_WINDOW_DAYS`); DARTS is scored on only
+  19–25 % of cards even when old.
+- **Talk Tracks are on hold (client, 2026-10-06): archive all,
+  redesign later.** `sp_call_adherence` has no row since 2026-09-25
+  and none will come; the Hub's adherence column has no source.
+  Proposed: hide it until the redesign.
+
+## Hub sorting on every column but Callback — shipped 2026-10-07
 
 Spec: [hub-sorting.md](hub-sorting.md) (PROD timings per candidate,
 scorecard index A/B). Branch `hub-sorting` in both repos.
@@ -29,8 +61,11 @@ scorecard index A/B). Branch `hub-sorting` in both repos.
 - **Scorecard sorts** (grade, DARTS) walk the contact's scorecards per
   task; `ix_sf_quality_scorecard_contact_type_date` (migration
   `c7e2a9d4f153`) cuts the rows read from ≈ 24 to < 1 on PROD data
-  (projected all time ≈ 4 s → ≈ 1 s; local A/B −46 % grade, −24 %
-  DARTS).
+  (PROD after deploy: all time 3.8–4.0 s → 0.83–0.86 s, month 0.5 s →
+  0.11 s).
+- **Argo does not run migrations any more** (noticed 2026-10-07: deploy
+  left `alembic_version` behind; DevOps ran it by hand). Check the
+  reader's `alembic_version` after every deploy that carries one.
 - **Key select carries the sort value** (`sort_N` labels) so the outer
   page orders by `page_keys.sort_N` and never re-evaluates a subquery or
   needs the sort's join. Ordering by a select-list alias is
@@ -45,12 +80,10 @@ scorecard index A/B). Branch `hub-sorting` in both repos.
 - Not built, noted: column hiding (Excel-style, per user) as its own
   feature — the client's "can't get everything in one view" ask.
 
-## Hub query shape after the performance pass — built locally, unmerged (2026-10-01)
+## Hub query shape after the performance pass — shipped (udab-server #792, udab-client #352; 2026-10-01)
 
 Spec: [hub-performance.md](hub-performance.md) (PROD measurements, the
-rewrites timed on the replica, the covering-index A/B). Branch
-`hub-performance` in udab-server and in udab-client (off
-`upstream/master`); no migration.
+rewrites timed on the replica, the covering-index A/B). No migration.
 
 - **Default period is "This month"** (client ask, 2026-10-02):
   `DEFAULT_PERIOD` in `src/constants/appointment-calls.js`;
@@ -116,12 +149,15 @@ rewrites timed on the replica, the covering-index A/B). Branch
   1.25 s, local 2 s); a LEFT JOIN to a "latest job task per Task"
   derived table would drop that to the default sort's cost.
 
-## Filter bar aligned with Talk Track Adherence — built locally, unmerged (2026-09-30)
+## Filter bar aligned with Talk Track Adherence — shipped (udab-client c35a0d1; 2026-09-30)
 
 Client asked that a filter over the same data look and work the same on
 every page. The Hub's filter bar now uses the Adherence chrome; the
 Adherence page changed only by extraction (no functional change).
-Client-only; no server or data change.
+Client-only; no server or data change. (Header corrected 2026-10-06:
+this and the sections below were still labelled "unmerged" after they
+shipped; the Pipeline-scorecard grade shipped as udab-server #787 /
+udab-client #347.)
 
 - **Shared pieces** (`udab-client/src/components/reports/`):
   `report-theme.css` (the `--report-*` palette, light + dark, on
@@ -157,7 +193,7 @@ Client-only; no server or data change.
   Recording, Search), then identities (Team, Rep, Account, Account
   owner, Industry), then the "Coming soon" placeholders.
 
-## Call insights (AI extraction) — built locally, unmerged (2026-09-25)
+## Call insights (AI extraction) — shipped (udab-server #778 + #783, udab-client #335; 2026-09-25)
 
 Spec: [call-insights.md](call-insights.md) (its Implemented section is the
 code map). Adherence-pattern feature: `sp_call_insight` (+ `_item`),
@@ -234,10 +270,9 @@ columns and export decided by Tomas 2026-09-23; open with the client
 2026-09-24: whether an SE "Appointment" is an appointment booked for
 an Abstrakt AE (decides if the Kind labels apply). Nothing built.
 
-## Round 4 ("Download all") — built, unmerged (2026-09-22)
+## Round 4 ("Download all") — shipped (udab-server d987f75, udab-client cb937b1; 2026-09-22)
 
-On branch `btn-download-all-transcripts` (both repos), not committed;
-spec: [call-queue-download-all.md](call-queue-download-all.md). A
+Spec: [call-queue-download-all.md](call-queue-download-all.md). A
 dedicated permission (`Download All Appointment Calls`) shows a button
 that zips **every transcribed call matching the current filters** in
 an AWS Batch job (`appointment-calls-export`), no table: the `POST`
@@ -247,7 +282,7 @@ polls and keeps the job in localStorage. The selected-rows export and
 the job share one pipeline (`ExportArchive`, `iter_export_batches`,
 `run_export`); `EXPORT_S3_CONCURRENCY` is 10 (boto3's pool size).
 Merge checklist in the spec's "Follow-ups at PR time".
-## Round 3b — mockup-shaped presentation (2026-09-16, uncommitted)
+## Round 3b — mockup-shaped presentation — shipped (udab-client #320; 2026-09-16)
 
 Client-demo requirement: the page must *read* as the mockups taking
 shape. Client-side only, on top of round 3:
@@ -271,10 +306,9 @@ shape. Client-side only, on top of round 3:
   "Meeting date" sorts by call date until meeting-date sort lands
   (tooltip says so).
 
-## Round 3 (consoles) — built, unmerged (2026-09-15)
+## Round 3 (consoles) — shipped (udab-server 07983d7, udab-client #320; 2026-09-15)
 
-On the `call-queue-3` working trees (both repos), not committed. The
-Bucket-1 slice of consoles-mockup-analysis.md:
+The Bucket-1 slice of consoles-mockup-analysis.md:
 
 - **Account owner**: column (sortable, `account_owner_name`), filter
   (`account_owner_ids` over `SfAccount.OwnerId`), `/filters` gains

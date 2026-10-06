@@ -1,15 +1,15 @@
 ---
 kind: spec
-status: in-progress
+status: done
 area: appointment-emails
-updated: 2026-09-11
+updated: 2026-10-06
 repos: [udab-server, udab-client]
 summary: "Call queue round 2: pitch calls join the population and Kind filter; per-call and bulk (ZIP) transcript export."
 ---
 
 # Call Queue round 2 — pitches in the population, transcript export
 
-Status: IN-PROGRESS 2026-09-11 — built in both repos on branch
+Status: DONE — shipped as udab-server dca6709, udab-client 87038fa (status corrected 2026-10-06). Original line: built in both repos on branch
 `call-queue-2`, tests green, PRs pending (see Implemented). Client ask
 2026-09-09; answers relayed by Tomas 2026-09-11; Q1 (filter shape)
 settled by Tomas the same day — no questions open. Builds directly on

@@ -1,15 +1,15 @@
 ---
 kind: spec
-status: in-progress
+status: done
 area: appointment-emails
-updated: 2026-10-02
+updated: 2026-10-06
 repos: [udab-server, udab-client]
 summary: "Hub load time: every page-load query timed on PROD, rewrites timed on the replica, covering index A/B done locally."
 ---
 
 # Account Management Hub — page-load performance
 
-Status: IN-PROGRESS 2026-10-01 — recommendations 1–4 built locally on branch `hub-performance` (udab-server), unmerged; see Implemented below. Analysis follows. Every number
+Status: DONE — shipped as udab-server #792 and udab-client #352 (status corrected 2026-10-06; the line used to say "built locally, unmerged"). See Implemented below. Analysis follows. Every number
 below was measured on 2026-10-01: PROD numbers on the Aurora reader
 (`cluster-ro`, 8.0.42, 42 GB buffer pool) with the exact SQL the
 routes compile (binds inlined via `scripts/local/explain_appointment_calls.py`'s
