@@ -42,7 +42,6 @@ Reading rule: open the area's `NOTES.md` first, then only active specs (draft/re
 
 | doc | kind | status | updated | summary |
 |---|---|---|---|---|
-| [hub-empty-cells.md](appointment-emails/hub-empty-cells.md) | spec | in-progress | 2026-10-06 | Replace every Hub dash with a reason: five kinds of empty counted on PROD, one word per cause, one sweeper fix. |
 | [call-queue-sales-enablement.md](appointment-emails/call-queue-sales-enablement.md) | spec | draft | 2026-09-23 | Sales Enablement calls in the call queue: third tab over a rep-department population, no client account, own columns. |
 | [consoles-mockup-analysis.md](appointment-emails/consoles-mockup-analysis.md) | notes | draft | 2026-09-14 | Delta analysis of the client's appointment/pitch console mockups vs. what the platform, SF and AI pipeline have today. |
 
@@ -52,6 +51,7 @@ Reading rule: open the area's `NOTES.md` first, then only active specs (draft/re
 |---|---|---|---|---|
 | [hub-sorting.md](appointment-emails/hub-sorting.md) | spec | done | 2026-10-07 | Every Hub column but Callback sorts; built on hub-sorting (both repos), scorecard index migration, PROD timings and A/B. |
 | [hub-performance.md](appointment-emails/hub-performance.md) | spec | done | 2026-10-06 | Hub load time: every page-load query timed on PROD, rewrites timed on the replica, covering index A/B done locally. |
+| [hub-empty-cells.md](appointment-emails/hub-empty-cells.md) | spec | done | 2026-10-06 | Replace every Hub dash with a reason: five kinds of empty counted on PROD, one word per cause, one sweeper fix. |
 | [call-queue-round-2.md](appointment-emails/call-queue-round-2.md) | spec | done | 2026-10-06 | Call queue round 2: pitch calls join the population and Kind filter; per-call and bulk (ZIP) transcript export. |
 | [call-queue-download-all.md](appointment-emails/call-queue-download-all.md) | spec | done | 2026-10-06 | Download all: Batch job zips every transcribed call matching the queue filters to S3; pre-signed URL, no table. |
 | [call-insights.md](appointment-emails/call-insights.md) | spec | done | 2026-10-06 | Per-call structured insights from transcripts: PoC done, V1 built locally on the adherence pattern; awaiting review. |

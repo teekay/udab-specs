@@ -9,22 +9,21 @@ summary: "Living reference: how the Appointment Calls queue works today (populat
 
 # Appointment Calls queue — how it works today
 
-## Empty cells: what a dash means — draft spec (2026-10-06)
+## Empty cells: what a dash means — shipped (udab-server #796, udab-client #356; 2026-10-06)
 
 Spec: [hub-empty-cells.md](hub-empty-cells.md). Client wants "—"
 replaced by a reason. Five classes of empty (not on the call / not yet
 / never / blank in SF / a bug), counted on PROD; one word per cause.
-**Built 2026-10-06 on branch `hub-empty-cells` in both repos,
-uncommitted.** Rule: "N/A" only where the column cannot apply to the
+**Shipped to PROD 2026-10-06.** Rule: "N/A" only where the column cannot apply to the
 row (briefing columns on non-booking kinds, talk share before
 2026-09-15); everything else names what is missing. Adherence column
 hidden on the Pitches view. New item field `review_window_open`.
 
-- **Bug, fixed on the branch:** transcribed calls under `MIN_CALL_SECONDS` (20) never
+- **Bug, fixed (#796):** transcribed calls under `MIN_CALL_SECONDS` (20) never
   get an `sp_call_insight` row (`_select_work` filters them out), and
   the client reads "transcribed, no row" as Pending — 404 calls on
   PROD show "Pending" forever. Fix in the sweeper, not the API.
-- **Sweeper leak, fixed on the branch:** `_select_work` selects every disposition in
+- **Sweeper leak, fixed (#796):** `_select_work` selects every disposition in
   `CALL_DISPOSITION_MAP` (Gatekeeper, Contact, Left Live Message
   included); `kind_for()` rejects them as `unsupported_disposition`.
   610 wasted rows, ~300/month.

@@ -1,6 +1,6 @@
 ---
 kind: spec
-status: in-progress
+status: done
 area: appointment-emails
 updated: 2026-10-06
 repos: [udab-server, udab-client]
@@ -9,9 +9,9 @@ summary: "Replace every Hub dash with a reason: five kinds of empty counted on P
 
 # Account Management Hub — what an empty cell says
 
-Status: IN-PROGRESS 2026-10-06 — built in both repos on branch
-`hub-empty-cells` (off upstream/master), uncommitted; tests green
-(server 95, client 1625). See "Implemented".
+Status: DONE 2026-10-06 — merged and deployed to PROD as udab-server
+#796 ("Call sweeper improvements") and udab-client #356 ("Report more
+accurate reasons for empty cells in the Hub"). See "Implemented".
 
 Client ask (2026-10-06, verbatim): "If we don't have a value because
 we didn't detect one or do not have one, please put that in the field
