@@ -9,6 +9,34 @@ summary: "Living reference: how the Appointment Calls queue works today (populat
 
 # Appointment Calls queue — how it works today
 
+## Salesmanship scorecard — draft, questions with the client (2026-10-07)
+
+Spec: [salesmanship-scorecard.md](salesmanship-scorecard.md). AM fills
+a five-criterion card in the flyout, written to Salesforce and upserted
+into the mirror in the same request. Facts verified on the production
+org and replica that outlive the spec:
+
+- `Quality_Scorecard__c` record types are the "scorecards"; new ones
+  arrive as record types (26 now; `Salesmanship_Scorecard` 2026-09-25,
+  `X5_Star_Scorecard` 2026-09-15). Record type ids differ per org —
+  resolve by `DeveloperName`, never hard-code for the sandbox.
+- **Scorecards reach the mirror once a day (`sfdc-sync` ≈ 10:00 UTC)**;
+  the hourly `sfdc-stream` skips `quality_scorecard`. A Hub write must
+  upsert the mirror itself.
+- **Exact card↔call link exists:** card `Call_ID__c` = `Task.Call_ID__c`
+  (dialer id, on every 2026 call task). The Apex trigger overwrites
+  `Caller__c`/`Account__c`/owner/managers from the Contact on insert
+  and stamps `Task.Abstrakt_Scorecard_ID__c` (one slot, last writer
+  wins) for any non-"Client*" card with a `Call_ID__c`. The Hub never
+  reads that slot.
+- PROD collation: `sf_task.Call_ID__c` is latin1, the scorecard's
+  `Call_ID__c` is utf8mb4 — convert before indexing or the match
+  cannot use an index (same trap as `Contact__c`).
+- Local Salesforce creds (sandbox in `sp_setting`, `SF_*` in `/.env`)
+  were both dead on 2026-10-07; prod integration creds live in PROD
+  `sp_setting` (`sfdc-prod-*`). Read-only use agreed by Tomas for
+  schema inspection only.
+
 ## Empty cells: what a dash means — shipped (udab-server #796, udab-client #356; 2026-10-06)
 
 Spec: [hub-empty-cells.md](hub-empty-cells.md). Client wants "—"
