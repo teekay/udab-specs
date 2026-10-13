@@ -119,4 +119,5 @@ Reading rule: open the area's `NOTES.md` first, then only active specs (draft/re
 
 | doc | kind | status | updated | summary |
 |---|---|---|---|---|
+| [local-db-collation-align.md](infra/local-db-collation-align.md) | howto | done | 2026-10-13 | Recipe to make a local dev DB match PROD charsets/collations per column, with loss guard, backup and FK handling. |
 | [ci-database-and-asyncio-fixes.md](infra/ci-database-and-asyncio-fixes.md) | spec | done | 2026-07-17 | CI gets a fresh schema-only MySQL sidecar; the Docker image copies pytest.ini so async tests no longer silently skip. |

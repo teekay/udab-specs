@@ -223,7 +223,8 @@ rewrites timed on the replica, the covering-index A/B). No migration.
   since 2026-10-12: the 19 Hub tables (and the FK columns pointing at
   them from other tables) were converted column by column to PROD's
   exact charset and collation after a byte-level check that no value
-  would lose characters; both seed align steps are now no-ops there. Bulk inserts also leave InnoDB stats stale for a
+  would lose characters; both seed align steps are now no-ops there.
+  Recipe: [infra/local-db-collation-align.md](../infra/local-db-collation-align.md). Bulk inserts also leave InnoDB stats stale for a
   while (the seed runs `ANALYZE TABLE`).
 - Follow-up candidate: the `transcript_state` sort still runs its four
   job-task subqueries per population row inside the id select (PROD
