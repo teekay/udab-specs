@@ -2,7 +2,7 @@
 kind: notes
 status: done
 area: transcription
-updated: 2026-09-23
+updated: 2026-10-08
 repos: [udab-server, udab-client]
 summary: "Living reference: how the transcription pipeline works today; specs are history."
 ---
@@ -45,8 +45,9 @@ At most one transcript per SF Task, ever: all job rows for a Task share one S3 k
 
 ## Scope rules (code constants — business rules are never in `sp_setting`)
 
-- Dispositions: `CALL_DISPOSITION_MAP` in `app/schemas/transcription_job.py` — `appointment` = the client's spelling-variant list incl. follow-ups, `Appointment Confirmation`, `Appointment Confirmed` (all confirmed IN 2026-08-24); `pitch` = `KDM Pitched` + `Pitch Follow - Up` / `Pitch Follow-Up` / `Pitch Follow Up`. SOQL `CallDisposition IN (...)`. The API enum stays two values.
-- Accounts (poller only): `Account.RecordTypeId IN (SfAccount.PIPELINE_CLIENT = '012A0000000kZfwIAE')` (`app/models/sf_account.py`) and `Account.Status__c = 'Active'`. The POST accepts the same as optional `accountRecordTypeIds` / `accountStatus`.
+- Dispositions: `CALL_DISPOSITION_MAP` in `app/schemas/transcription_job.py` — `appointment` = the client's spelling-variant list incl. follow-ups, `Appointment Confirmation`, `Appointment Confirmed` (all confirmed IN 2026-08-24); `pitch` = `KDM Pitched` + `Pitch Follow - Up` / `Pitch Follow-Up` / `Pitch Follow Up`. `conversation` = `Gatekeeper` / `Contact` / `Left Live Message` (live in prod since 2026-09-26). SOQL `CallDisposition IN (...)`.
+- Accounts (poller only): `Account.RecordTypeId IN (SfAccount.PIPELINE_CLIENT = '012A0000000kZfwIAE')` (`app/models/sf_account.py`) and `Account.Status__c = 'Active'`, **OR** `Task.OwnerId` in the sales-enablement role holders (`task_owner_roles` `SDR` / `Director of Sr SDR`, resolved per tick from `sf_user`, ~28 ids echoed in `filters_json.eligible_task_owner_ids`). `conversation` uses the owner scope only (`call_result_scope: sales_enablement`); when no owners resolve, conversation is skipped for that tick. The POST accepts the account filters as optional `accountRecordTypeIds` / `accountStatus`.
+- Health check 2026-10-08 (mirror, 14 d): 12,746 eligible Tasks, all `completed` except 34 conversation Tasks from 2026-09-24 (created before the conversation rollout's first 24 h window) and one `unsupported_vendor` (Zoom share link stamped into `Call_Recording_URL_Public__c`). Query recipe: `sf_task` ⋈ `sf_account` with the rules above, left-join `sp_transcription_job_task` grouped by `sf_task_sf_id`.
 - Date basis: poller uses `CreatedDate >= now − --lookback-hours` (default 24) with `ORDER BY CreatedDate DESC LIMIT MAX_SOQL_ROWS` (10,000, `transcription_jobs.py`). The POST keeps the `Appt_Set_Date__c` calendar range (`startDate`/`endDate`) or `createdSince`.
 - Eligibility: `Call_Recording_URL_Public__c != null` — re-evaluated against SF live every tick, so a URL stamped later is picked up on a later tick.
 - Claimed exclusion (`claimed_sf_task_ids`): skip Tasks with a row in `CLAIMED_STATUSES = (completed, pending, transcribing)`, a `skipped/unsupported_vendor` row (permanent), or a `failed` row newer than `FAILED_RETRY_AFTER_HOURS = 6`. Worker re-checks completed-only as a last line.

@@ -2,16 +2,27 @@
 kind: notes
 status: done
 area: appointment-emails
-updated: 2026-10-07
+updated: 2026-10-08
 repos: [udab-server, udab-client]
 summary: "Living reference: how the Appointment Calls queue works today (population, kinds, transcript state, export); specs are history."
 ---
 
 # Appointment Calls queue — how it works today
 
-## Salesmanship scorecard — draft, questions with the client (2026-10-07)
+## Hub vs auto-transcriber population delta — draft for the client (2026-10-08)
 
-Spec: [salesmanship-scorecard.md](salesmanship-scorecard.md). AM fills
+Spec: [hub-vs-transcriber-delta.md](hub-vs-transcriber-delta.md). The
+poller (udab-server #774, 2026-09-26) transcribes wider than the Hub
+shows: conversation calls, sales-enablement owners' calls on
+non-Active accounts, and calls whose account later left Active. ≈ 2,000
+transcribed-but-invisible calls per 14 days on PROD; Hub → transcriber
+has no gap. The insights sweeper has no account rule, so the invisible
+appointment/pitch ones still get Bedrock insights. Questions for the
+client are in the spec; nothing decided.
+
+## Salesmanship scorecard — ready to merge (built 2026-10-08, rebased 2026-10-12)
+
+Spec: [salesmanship-scorecard.md](salesmanship-scorecard.md) (branch `salesmanship-scorecard` in both repos, rebased onto upstream master 2026-10-12; the client's trigger change is live in all three orgs since 2026-10-08 and the client confirmed on 2026-10-12 that no other SF automation changes, so Caller stays the contact owner). AM fills
 a five-criterion card in the flyout, written to Salesforce and upserted
 into the mirror in the same request. Facts verified on the production
 org and replica that outlive the spec:
@@ -30,12 +41,45 @@ org and replica that outlive the spec:
   wins) for any non-"Client*" card with a `Call_ID__c`. The Hub never
   reads that slot.
 - PROD collation: `sf_task.Call_ID__c` is latin1, the scorecard's
-  `Call_ID__c` is utf8mb4 — convert before indexing or the match
-  cannot use an index (same trap as `Contact__c`).
+  `Call_ID__c` is utf8mb4_0900_ai_ci, and **that is fine**: the Hub
+  probes the scorecard index with the task's value, MySQL converts the
+  narrower latin1 value to utf8mb4, and the covering lookup on
+  `ix_sf_quality_scorecard_type_call_id` happens as-is (replicated
+  PROD's charsets locally 2026-10-12; plans and timings identical to
+  the matched case). The index-side column must be the wider charset
+  or the same collation; the `Contact__c` trap is the reverse
+  direction (indexed latin1 column vs utf8mb4 task column) and a
+  same-charset, different-collation pair errors ("illegal mix").
+  The first draft of migration `a1c3e5f7b9d2` converted the column
+  to latin1; dropped on review, no PROD DDL beyond the columns and
+  the index.
+- **Planner trap, "newest card" subqueries:** `ORDER BY id DESC LIMIT 1`
+  (or `CreatedDate DESC`) inside a dependent scalar subquery makes MySQL
+  walk that ordering index backwards for every call without a card —
+  minutes on the all-time population. The Salesmanship lookup is
+  `MAX(id)` over the `(type, Call_ID__c)` index plus a PK lookup, with
+  the aggregate on its own alias and `.correlate(SfTask)` (the plain
+  model auto-correlates to the outer subquery's row). Local, 91k rows:
+  filters ≈ 0.5 s (= default page), sort ≈ 1.7 s. The DARTS subquery
+  survives because its index covers the `Appt_Date__c` range.
+- Writes go through `app/services/salesmanship_scorecard.py` and the
+  sync's own upsert; record type ids are resolved by developer name
+  (per-org ids). `vue-cli-service lint --fix <file>` lints the whole
+  project despite the file argument — run it with `--no-fix` or
+  revert the strays.
 - Local Salesforce creds (sandbox in `sp_setting`, `SF_*` in `/.env`)
   were both dead on 2026-10-07; prod integration creds live in PROD
   `sp_setting` (`sfdc-prod-*`). Read-only use agreed by Tomas for
-  schema inspection only.
+  schema inspection only. Sandbox login works again since 2026-10-08.
+- **Re-parenting a migration without losing local data:** back up the
+  table (`mysqldump` from `udab-db`), `alembic stamp <old parent>`,
+  `alembic upgrade <new parent>`, `alembic stamp <ours>`; the columns
+  our migration adds stay in place. Prove the chain from scratch with
+  `FRESH=1 ./scripts/test.sh`.
+- **`scripts/test.sh` defaults `TEST_DB` to `udab_test_001`**, but 216
+  upstream tests assert the database is `udab_test` or `test_db` and
+  error out otherwise (upstream mismatch, seen 2026-10-12). Run the
+  full suite as `TEST_DB=udab_test FRESH=1 ./scripts/test.sh`.
 
 ## Empty cells: what a dash means — shipped (udab-server #796, udab-client #356; 2026-10-06)
 
@@ -90,9 +134,12 @@ scorecard index A/B). Branch `hub-sorting` in both repos.
   `c7e2a9d4f153`) cuts the rows read from ≈ 24 to < 1 on PROD data
   (PROD after deploy: all time 3.8–4.0 s → 0.83–0.86 s, month 0.5 s →
   0.11 s).
-- **Argo does not run migrations any more** (noticed 2026-10-07: deploy
-  left `alembic_version` behind; DevOps ran it by hand). Check the
-  reader's `alembic_version` after every deploy that carries one.
+- **Migrations on deploy:** on 2026-10-07 a deploy left
+  `alembic_version` behind and DevOps ran it by hand. udab-server #799
+  (merged 2026-10-09) now gates prod like stage: a k8s Job runs
+  `alembic upgrade head` and retags the image `prod-migrated-<sha>`
+  before Argo deploys it. Still check the reader's `alembic_version`
+  after every deploy that carries one.
 - **Key select carries the sort value** (`sort_N` labels) so the outer
   page orders by `page_keys.sort_N` and never re-evaluates a subquery or
   needs the sort's join. Ordering by a select-list alias is
@@ -168,8 +215,15 @@ rewrites timed on the replica, the covering-index A/B). No migration.
   local `sf_task` is `utf8mb4_general_ci`. With mismatched collations
   the scorecard subqueries cannot use `ix_sf_quality_scorecard_contact`
   and the local page costs 3–4 s instead of 0.5 s. The enrich seed
-  now aligns the local scorecard column to `sf_task.WhoId`'s collation;
-  PROD needs nothing. Bulk inserts also leave InnoDB stats stale for a
+  now aligns the local scorecard column to `sf_task.WhoId`'s collation,
+  and gives local `sf_task.Call_ID__c` PROD's latin1 definition (a
+  utf8mb4_general_ci task column against the scorecard's
+  utf8mb4_0900_ai_ci errors with "illegal mix of collations", seen
+  2026-10-12); PROD needs nothing. On Tomas's dev DB the drift is gone
+  since 2026-10-12: the 19 Hub tables (and the FK columns pointing at
+  them from other tables) were converted column by column to PROD's
+  exact charset and collation after a byte-level check that no value
+  would lose characters; both seed align steps are now no-ops there. Bulk inserts also leave InnoDB stats stale for a
   while (the seed runs `ANALYZE TABLE`).
 - Follow-up candidate: the `transcript_state` sort still runs its four
   job-task subqueries per population row inside the id select (PROD

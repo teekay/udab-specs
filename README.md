@@ -42,7 +42,9 @@ Reading rule: open the area's `NOTES.md` first, then only active specs (draft/re
 
 | doc | kind | status | updated | summary |
 |---|---|---|---|---|
-| [salesmanship-scorecard.md](appointment-emails/salesmanship-scorecard.md) | spec | draft | 2026-10-07 | AM fills a Salesmanship card per call in the Hub flyout; written to SF (new record type), mirrored at once, filterable. |
+| [hub-records-summary.md](appointment-emails/hub-records-summary.md) | spec | draft | 2026-10-13 | Procedural sentence above the Hub table (count, excellent, DM, needs review, avg stars) from one aggregate query. |
+| [salesmanship-scorecard.md](appointment-emails/salesmanship-scorecard.md) | spec | in-progress | 2026-10-12 | AM fills a Salesmanship card per call in the Hub flyout; written to SF (new record type), mirrored at once, filterable. |
+| [hub-vs-transcriber-delta.md](appointment-emails/hub-vs-transcriber-delta.md) | spec | draft | 2026-10-08 | What the auto-transcriber transcribes that the Hub never shows: three classes measured on PROD, client questions. |
 | [call-queue-sales-enablement.md](appointment-emails/call-queue-sales-enablement.md) | spec | draft | 2026-09-23 | Sales Enablement calls in the call queue: third tab over a rep-department population, no client account, own columns. |
 | [consoles-mockup-analysis.md](appointment-emails/consoles-mockup-analysis.md) | notes | draft | 2026-09-14 | Delta analysis of the client's appointment/pitch console mockups vs. what the platform, SF and AI pipeline have today. |
 
