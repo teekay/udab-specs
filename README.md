@@ -90,6 +90,8 @@ Reading rule: open the area's `NOTES.md` first, then only active specs (draft/re
 
 ## Talk track
 
+- **Living reference:** [talk-track/NOTES.md](talk-track/NOTES.md) — read this first.
+
 **Active**
 
 | doc | kind | status | updated | summary |
@@ -102,6 +104,7 @@ Reading rule: open the area's `NOTES.md` first, then only active specs (draft/re
 
 | doc | kind | status | updated | summary |
 |---|---|---|---|---|
+| [session-id-postmessage.md](talk-track/session-id-postmessage.md) | spec | done | 2026-10-16 | Embed iframe posts its session id to the Salesforce page; signed parent_origin names the embedding page. |
 | [sf-task-session-link-report.md](talk-track/sf-task-session-link-report.md) | spec | done | 2026-08-02 | Per-record unmatched report (detail + summary CSV to S3) with diagnosed reasons for the session-link job, both sides. |
 | [sf-task-session-link.md](talk-track/sf-task-session-link.md) | spec | done | 2026-07-12 | Daily job stamping Talk_Track_Session_Id__c on SF call Tasks by dialed number + contact + 1h window. |
 
@@ -114,6 +117,14 @@ Reading rule: open the area's `NOTES.md` first, then only active specs (draft/re
 | [client-domain-dnc.md](dnc/client-domain-dnc.md) | spec | done | 2026-07-02 | Add each Active/On Hold account's website domain to its DNC list (reason 'Client Domain'): backfill command + sync hook. |
 
 ## Infra
+
+- **Living reference:** [infra/NOTES.md](infra/NOTES.md) — read this first.
+
+**Active**
+
+| doc | kind | status | updated | summary |
+|---|---|---|---|---|
+| [read-replica-rollout.md](infra/read-replica-rollout.md) | spec | in-progress | 2026-10-19 | Move all read traffic off the Aurora writer: auth middleware first, Hub sibling reads, then ~160 clean read routes. |
 
 **Done**
 
