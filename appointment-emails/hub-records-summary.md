@@ -174,9 +174,12 @@ counter: the sentence starts with the same number). The template logic
 `src/constants/appointment-calls.js` or a small `hubSummarySentence()`
 module with a vitest file; the component only calls it.
 
-**Client-safe view: out of scope.** The switch exists in the code on
-master but is currently disabled while the client decides what the
-view should hide (2026-10-13). When it comes back, the "need review"
+**Client-safe view: out of scope.** The switch is still live on
+master. The commit that commented it out (udab-client `10ddcf9`,
+2026-10-06) sits on the unpushed local branch
+`itemize-null-column-reasons` and never reached a PR; the client is
+still deciding what the view should hide (2026-10-13, corrected
+2026-10-20). When it comes back, the "need review"
 clause is AM-only and must drop out of the sentence the same way the
 flags column does (`CLIENT_SAFE_HIDDEN_KEYS`); note it there, do not
 build it here.

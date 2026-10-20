@@ -2,7 +2,7 @@
 kind: spec
 status: in-progress
 area: appointment-emails
-updated: 2026-10-12
+updated: 2026-10-19
 repos: [udab-server, udab-client]
 summary: "AM fills a Salesmanship card per call in the Hub flyout; written to SF (new record type), mirrored at once, filterable."
 ---
@@ -46,7 +46,22 @@ Edit layout for the record type:
 | (formula) | `Salesmanship_Score__c` | percent, read-only: sum of the five "1"s / 5; help text "5 possible points" |
 
 The per-field help text in Salesforce is the client's rubric verbatim
-(Score 1 / Score 0 sentences); the Hub form shows the same text.
+(Score 1 / Score 0 sentences). The Hub form showed the same text until
+the copy revision below.
+
+## Copy revision (proposed 2026-10-19, unmerged)
+
+Client meeting notes (2026-10-19): shorten each criterion's description,
+show an example of what right looks like (green, checkmark) and what
+wrong looks like (red, X), and make the wrong ones funny. Built on
+`update-salesmanship-scorecard-copy` in `udab-client` (the server holds
+no rubric text): `SALESMANSHIP_CRITERIA` entries carry `summary`,
+`right`, `wrong` instead of `one`/`zero`; the form shows the one-line
+summary under the label and the two examples as green/red boxes, always
+visible (the collapsible "Scoring guide" is gone). Examples are lifted
+from the client's HVAC example talk track (Alex at Summit Mechanical,
+`Example Talk Track Flow Chart.pdf`, 2026-09-24). The Salesforce help
+text is unchanged. Awaiting the client's reaction to a screenshot.
 
 No active validation rules. One active Apex trigger,
 `QualityScorecardTrigger` → `QualityScorecardTriggerHandler`:

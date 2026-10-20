@@ -62,6 +62,10 @@ org and replica that outlive the spec:
   model auto-correlates to the outer subquery's row). Local, 91k rows:
   filters ≈ 0.5 s (= default page), sort ≈ 1.7 s. The DARTS subquery
   survives because its index covers the `Appt_Date__c` range.
+- Form copy (2026-10-19, proposed): the rubric on the form is no longer
+  the Salesforce help text verbatim; it is a one-line summary plus a
+  right/wrong example per criterion, in the client constants only. Keep
+  the examples in the client's HVAC talk-track voice when editing.
 - Writes go through `app/services/salesmanship_scorecard.py` and the
   sync's own upsert; record type ids are resolved by developer name
   (per-org ids). `vue-cli-service lint --fix <file>` lints the whole
