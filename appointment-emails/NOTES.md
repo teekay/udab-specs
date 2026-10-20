@@ -19,6 +19,18 @@ transcribed-but-invisible calls per 14 days on PROD; Hub → transcriber
 has no gap. The insights sweeper has no account rule, so the invisible
 appointment/pitch ones still get Bedrock insights. Questions for the
 client are in the spec; nothing decided.
+**Corrected 2026-10-20:** Hub → transcriber does have a gap. CloudCall
+confirmation / follow-up calls get their URL days later than the
+poller's 24 h window and are never picked up (≈ 1,250 since
+2026-09-01, ≈ 7 % of that class transcribed). Separately, every
+pre-rollout call with a URL (created before 2026-08-24, ≈ 110,000
+Hub rows since January, Orum and CloudCall alike) is `transcript_state
+= pending`, which the AI cells render as "Transcribing…"
+(`insightsState()` folds `pending` into `transcribing`). Client asked
+on 2026-10-20 for honest wording for both: "not yet retroactively
+transcribed" for pre-rollout calls. The "no recording URL" case already
+shows "No recording" with the dialer named (shipped with the empty-cells
+work). Spec: [../transcription/late-url-sweep.md](../transcription/late-url-sweep.md) (daily sweep + `queued` / `not_transcribed` states). Nothing built yet.
 
 ## Salesmanship scorecard — ready to merge (built 2026-10-08, rebased 2026-10-12)
 

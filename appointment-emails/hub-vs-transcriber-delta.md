@@ -53,6 +53,17 @@ transcribed (11,107 appointment + pitch). The 547 Hub rows without a
 recording show "No recording", which is a vendor fact, not a miss.
 Zero Hub rows are stuck in "Pending" past the poller's 24 h window.
 
+**Correction 2026-10-20 (PROD replica, same method):** the "no gap"
+claim above is wrong for CloudCall confirmation and follow-up calls.
+Their recording URL is stamped days to weeks after the call (median
+≈ 3 days; `URL_Expiry_Time__c` set, so not our stamper), outside the
+poller's 24 h `CreatedDate` window, and nothing re-scans: since
+2026-09-01, 1,252 such Hub rows have a URL and no job row (648
+Appointment Confirmation, 594 Appointment Follow-up; ≈ 40 per working
+day), and only ≈ 7 % of that class is transcribed at all. The Hub
+shows them as "Transcribing…" indefinitely (see the pre-rollout note
+in NOTES.md, same symptom). Needs a re-scan rule, not a wording fix.
+
 **Transcriber → Hub: ~2,000 transcribed calls the Hub never shows.**
 
 | Class | 14-day count | Why the Hub hides it |

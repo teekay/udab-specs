@@ -12,6 +12,7 @@ Reading rule: open the area's `NOTES.md` first, then only active specs (draft/re
 
 | doc | kind | status | updated | summary |
 |---|---|---|---|---|
+| [late-url-sweep.md](transcription/late-url-sweep.md) | spec | in-progress | 2026-10-20 | URLs arriving after the 24 h poller window: daily 45-day sweep, retry cap, queued / not-transcribed Hub states. |
 | [cloudcall-url-heal.md](transcription/cloudcall-url-heal.md) | spec | draft | 2026-09-18 | Expired CloudCall URLs: one-off re-mint recovery (Software Advice) and the stamp-cloudcall-urls refresh/expiry patch. |
 | [search-endpoint.md](transcription/search-endpoint.md) | spec | ready | 2026-09-09 | Transcript search for the call-quality team: filterable, cursor-paged GET /api/transcripts over produced transcripts. |
 

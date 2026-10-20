@@ -107,6 +107,8 @@ At most one transcript per SF Task, ever: all job rows for a Task share one S3 k
 
 ## Open threads
 
+- **Late recording URLs (2026-10-20).** CloudCall confirmation / follow-up calls get their URL days to weeks after the call (client-side bulk refresher; our stamper never matches them), after the poller's 24 h window; ≈ 1,250 Hub rows since 2026-09-01 never transcribed and shown as "Transcribing…". Fix: daily `auto-transcribe --backfill --lookback-hours 1080` sweep + retry cap + honest Hub states — `late-url-sweep.md`.
+
 - Refreshing expired CloudCall URLs — findings, a completed one-off recovery (485/489 by exact call-id match) and the proposed stamper patch (stamp `URL_Expiry_Time__c`; rolling refresh selector) live in `cloudcall-url-heal.md`; gated on client IT confirming what changed ~2026-09-01.
 - Per-end-client `keyterm` vocabulary — no source decided (SF custom field vs collation); `keyterm` is nova-3-only and httpx `params` must be a list of tuples to repeat it.
 - Call grade / opportunity grade — columns reserved in `../appointment-emails/call-queue.md` (lean), producer undecided (Q17 there).
