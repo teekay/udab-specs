@@ -12,7 +12,7 @@ Reading rule: open the area's `NOTES.md` first, then only active specs (draft/re
 
 | doc | kind | status | updated | summary |
 |---|---|---|---|---|
-| [late-url-sweep.md](transcription/late-url-sweep.md) | spec | in-progress | 2026-10-20 | URLs arriving after the 24 h poller window: daily 45-day sweep, retry cap, queued / not-transcribed Hub states. |
+| [late-url-sweep.md](transcription/late-url-sweep.md) | spec | in-progress | 2026-10-21 | URLs arriving after the 24 h poller window: LastModifiedDate tick + 45 d floor, retry cap, honest Hub states. |
 | [cloudcall-url-heal.md](transcription/cloudcall-url-heal.md) | spec | draft | 2026-09-18 | Expired CloudCall URLs: one-off re-mint recovery (Software Advice) and the stamp-cloudcall-urls refresh/expiry patch. |
 | [search-endpoint.md](transcription/search-endpoint.md) | spec | ready | 2026-09-09 | Transcript search for the call-quality team: filterable, cursor-paged GET /api/transcripts over produced transcripts. |
 
@@ -43,7 +43,7 @@ Reading rule: open the area's `NOTES.md` first, then only active specs (draft/re
 
 | doc | kind | status | updated | summary |
 |---|---|---|---|---|
-| [salesmanship-scorecard.md](appointment-emails/salesmanship-scorecard.md) | spec | in-progress | 2026-10-19 | AM fills a Salesmanship card per call in the Hub flyout; written to SF (new record type), mirrored at once, filterable. |
+| [salesmanship-scorecard.md](appointment-emails/salesmanship-scorecard.md) | spec | in-progress | 2026-10-21 | AM fills a Salesmanship card per call in the Hub flyout; written to SF (new record type), mirrored at once, filterable. |
 | [hub-records-summary.md](appointment-emails/hub-records-summary.md) | spec | draft | 2026-10-13 | Procedural sentence above the Hub table (count, excellent, DM, needs review, avg stars) from one aggregate query. |
 | [hub-vs-transcriber-delta.md](appointment-emails/hub-vs-transcriber-delta.md) | spec | draft | 2026-10-08 | What the auto-transcriber transcribes that the Hub never shows: three classes measured on PROD, client questions. |
 | [call-queue-sales-enablement.md](appointment-emails/call-queue-sales-enablement.md) | spec | draft | 2026-09-23 | Sales Enablement calls in the call queue: third tab over a rep-department population, no client account, own columns. |

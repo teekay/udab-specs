@@ -2,7 +2,7 @@
 kind: spec
 status: in-progress
 area: appointment-emails
-updated: 2026-10-19
+updated: 2026-10-21
 repos: [udab-server, udab-client]
 summary: "AM fills a Salesmanship card per call in the Hub flyout; written to SF (new record type), mirrored at once, filterable."
 ---
@@ -57,8 +57,9 @@ wrong looks like (red, X), and make the wrong ones funny. Built on
 `update-salesmanship-scorecard-copy` in `udab-client` (the server holds
 no rubric text): `SALESMANSHIP_CRITERIA` entries carry `summary`,
 `right`, `wrong` instead of `one`/`zero`; the form shows the one-line
-summary under the label and the two examples as green/red boxes, always
-visible (the collapsible "Scoring guide" is gone). Examples are lifted
+summary under the label and the two examples as green/red boxes behind
+an "Examples" expand/collapse toggle (client ask 2026-10-21, after
+seeing them always visible). Examples are lifted
 from the client's HVAC example talk track (Alex at Summit Mechanical,
 `Example Talk Track Flow Chart.pdf`, 2026-09-24). The Salesforce help
 text is unchanged. Awaiting the client's reaction to a screenshot.
