@@ -9,6 +9,102 @@ summary: "Living reference: how the Appointment Calls queue works today (populat
 
 # Appointment Calls queue — how it works today
 
+## Client feedback round, 2026-10-13 — built, unmerged (udab-client `hub-renames`, udab-server `hub-5star-scorecard` working tree)
+
+The client's written list plus the Loom. Built client-side except the
+export header; the 5-star Opportunity grade is a separate commit.
+
+- **Wording:** filter and column "Kind" → "Call Result"; kinds read
+  Appointment / Confirmation / Appointment Follow Up / Reschedule and
+  Pitch / Pitch Follow Up (`KINDS` client-side, `KIND_LABELS` server-side
+  for the export header, whose label column widened to 13). "Call" column
+  → "Call Duration", the saved/vendor source hint under the time is gone.
+- **Default Call Result per view** (`DEFAULT_KINDS_BY_VIEW`): Appointments
+  opens on Appointment + Confirmation + Reschedule, Pitches on Pitch;
+  follow-ups are one click away. An empty selection still means every
+  kind in the view ("All"); a stored view with no kinds (every preference
+  saved before this) opens on the default, so nobody keeps the old "All".
+  The trigger lists the selected labels up to three (`list-up-to` on
+  `CheckboxMultiSelect`, opt-in) instead of "3 Selections".
+- **Declutter:** Transcript, Summary and Briefing columns left both
+  tables. The flyout keeps all three (transcript state badge, summary
+  section, briefing button) and gained the Download button the transcript
+  column used to carry. No transcript-state filter exists; the Recording
+  filter is the proxy, and a `transcript_state` filter would be the
+  four-subquery sort cost per population row (see the performance pass).
+- **Why no recording** (`noRecordingReason`): under an hour after the
+  call the cell says "No recording yet" (dialer stamp / SF batch / hourly
+  mirror sync); after that "The dialer delivered no recording for this
+  call, so there is nothing to transcribe". Nothing on the Task says which
+  dialer or why: on the local mirror every no-URL row has a `Call_ID__c`
+  and no CloudCall session id, Orum list name or `[Orum]` subject, same
+  as the rows with a URL. Shown on the play button, insight and summary
+  placeholders, and the flyout's transcript / summary / recording panes.
+- **Verified on the PROD reader later that night** (skill
+  `.claude/skills/prod-readonly-db.md`; queries in
+  `udab-server/scripts/local/hub_feedback_prod_checks.py`, gitignored,
+  also on CANARO), Hub population, last 30 days:
+  - *"Follow-ups are not transcribed"* is true in effect, for want of a
+    recording, not a pipeline gap: every call with a recording URL is
+    transcribed (3 stale of 24k). But 416 of 552 follow-ups, 433 of 486
+    confirmations and 154 of 156 pitch follow-ups have no URL, and those
+    are **CloudCall** calls (`synety__Call_Session_Id__c` set, no
+    campaign name): CloudCall confirmation / follow-up calls came with a
+    recording 6 + 4 + 0 times out of 433 + 413 + 153. The same
+    dispositions placed through Orum (list name set) always have one
+    (46 / 123 / 1 of as many). Bookings and pitches lack a URL on < 1 %.
+    So the question for the client is why CloudCall does not record (or
+    stamp) confirmation and follow-up calls. No no-URL row was under an
+    hour old; 50 of 1,190 were under a day.
+  - The item now carries `dialer` (URL host, else CloudCall session id,
+    else Orum list name) so the no-recording text names CloudCall / Orum.
+  - *"Company looks like an address on some rows"*: it is Contact
+    `Company__c` (no lead-linked Hub task in 30 days; 7 blank of 22,835
+    contacts). 73 values start with a street number or carry one, all of
+    them company names such as "4312 NORTH PALAFOX INC" or "76 Joint
+    Venture". The address the client saw is the Building column.
+  - "Confirmation" = `Appointment Confirmation` (486 in 30 days; the
+    `Appointment Confirmed` spelling did not occur).
+
+## 5-star Opportunity grade — built 2026-10-13, unmerged (separate commit)
+
+The client: "I checked the sf_quality_scorecard table and looks like
+we're getting entries". PROD reader, 2026-10-13:
+
+- `Record_Type_Developer_Name__c = 'X5_Star_Scorecard'`: 1,653 cards
+  since 2026-09-16 (2 + 1 + 734 + 755 + 161 per ISO week), 7 deleted,
+  every one with `X5_Star_Score__c` (a percent) and `Stars_Count__c`
+  (= percent / 20, so **0–5 with decimals**, e.g. 3.44; whole-star
+  buckets 0: 20, 1: 96, 2: 433, 3: 828, 4: 269). `Opportunity_Score__c`
+  is null on all, `Call_ID__c` on all; `Contact__c` and `Appt_Date__c`
+  on all. The criteria columns that vary: `Clear_reason_to_meet_Score__c`,
+  `Fits_Qualifiers_Score__c`, `Accuracy_of_Notes_Score__c`,
+  `Is_the_Appt_set_with_the_KDM_Influencer__c`, `Quality_of_Meeting_Score__c`.
+- **`Appt_Date__c` on a 5-star card is the booking call's day** (1,726
+  of 1,780 matches at 0 days, the rest a reschedule or a later call on
+  the contact), and the card is created the same or the next day (1,136
+  + 483 of 1,646). The 60-day window the Pipeline and DARTS cards use is
+  therefore a superset; kept for one code path. 47 contacts have two
+  cards; newest scored wins, as for the other cards.
+- Coverage: of 3,873 booking calls since 2026-09-16, 1,538 have a 5-star
+  card (1,532 scored > 0 %) and 1,598 a Pipeline card with stars
+  (**Pipeline `Stars_Count__c` is a fraction of one, max 0.8 seen** —
+  the two cards use different scales).
+- Built: `SCORECARD_TYPE_FIVE_STAR`, a third scorecard subquery
+  (`X5_Star_Score__c > 0` = scored, as `Stars_Count__c > 0` is for the
+  Pipeline card), the grade prefers the 5-star card and falls back to
+  the Pipeline card (the only source before 2026-09-16); payload gains
+  `stars_exact` and `score_pct`, `source` is `five_star` | `pipeline`.
+  The grade sort is `COALESCE(5-star stars, Pipeline stars × 5)`: two
+  correlated subqueries per population row instead of one, both on
+  `ix_sf_quality_scorecard_contact_type_date`. Client: the stars cell
+  shows the rounded glyphs plus "3.4", tooltip "3.4 of 5 stars (69%) on
+  the 5-star scorecard for …"; the column sub-label and the empty-cell
+  tooltips say 5-star.
+- Not done: a Grade filter (still the "Coming soon" placeholder), and
+  per-criterion display of the 5-star card (the client has not asked).
+
+
 ## Hub vs auto-transcriber population delta — draft for the client (2026-10-08)
 
 Spec: [hub-vs-transcriber-delta.md](hub-vs-transcriber-delta.md). The
